@@ -26,7 +26,9 @@ type globalOptions struct {
 	ConfigPath string
 	Profile    string
 	Format     string
+	FormatSet  bool
 	Timeout    time.Duration
+	TimeoutSet bool
 	Verbose    bool
 	Debug      bool
 }
@@ -50,7 +52,6 @@ func Run(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
-	_ = opts
 
 	if len(rest) == 0 {
 		printHelp(os.Stdout)
@@ -64,6 +65,8 @@ func Run(args []string) int {
 	case "version", "--version", "-v":
 		fmt.Fprintf(os.Stdout, "%s development\n", appName)
 		return exitcode.Success
+	case "validate-config":
+		return runValidateConfig(opts)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
@@ -114,6 +117,7 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 				return opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl", v)
 			}
 			opts.Format = v
+			opts.FormatSet = true
 			i = next
 		case "--timeout":
 			v, next, err := flagValue("--timeout", value, hasInlineValue, args, i)
@@ -128,6 +132,7 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 				return opts, nil, fmt.Errorf("timeout must be positive")
 			}
 			opts.Timeout = d
+			opts.TimeoutSet = true
 			i = next
 		case "--verbose":
 			opts.Verbose = true
@@ -176,11 +181,11 @@ Global flags:
   --debug             Print protocol-level diagnostics to stderr
 
 Available commands:
-  help       Show this help message
-  version    Show version information
+  help             Show this help message
+  version          Show version information
+  validate-config  Validate local configuration without connecting to a server
 
 Planned commands:
-  validate-config
   test-connection
   listen
   interrogate
