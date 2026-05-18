@@ -547,7 +547,7 @@ iec-104-cli command single --ioa 1000 --value on --dry-run
 
 ## Task 16: Add `command double`
 
-Status: [ ]
+Status: [x]
 
 Implement double command.
 

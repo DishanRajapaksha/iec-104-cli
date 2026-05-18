@@ -120,6 +120,15 @@ func (c *WendyClient) SendSingleCommand(ctx context.Context, commonAddress uint1
 	return mapWendyError(c.client.SendCmd(commonAddress, asdu.C_SC_NA_1, asdu.InfoObjAddr(ioa), value))
 }
 
+func (c *WendyClient) SendDoubleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value uint8) error {
+	if c.client == nil || !c.client.IsConnected() {
+		if err := c.Connect(ctx); err != nil {
+			return err
+		}
+	}
+	return mapWendyError(c.client.SendCmd(commonAddress, asdu.C_DC_NA_1, asdu.InfoObjAddr(ioa), value))
+}
+
 type wendyCallback struct {
 	events chan<- PointValue
 }

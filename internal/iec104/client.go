@@ -13,6 +13,7 @@ type Client interface {
 	Listen(ctx context.Context, handler func(PointValue)) error
 	Read(ctx context.Context, commonAddress uint16, ioa uint32) (PointValue, error)
 	SendSingleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value bool) error
+	SendDoubleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value uint8) error
 }
 
 type ClientConfig struct {

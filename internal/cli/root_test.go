@@ -91,6 +91,32 @@ func TestParseSingleCommandValue(t *testing.T) {
 	}
 }
 
+func TestRunCommandDoubleDryRun(t *testing.T) {
+	if got := Run([]string{"command", "double", "--ioa", "1001", "--value", "close", "--dry-run"}); got != exitcode.Success {
+		t.Fatalf("Run(command double dry run) = %d, want %d", got, exitcode.Success)
+	}
+}
+
+func TestParseDoubleCommandValue(t *testing.T) {
+	tests := map[string]uint8{
+		"intermediate":  0,
+		"open":          1,
+		"off":           1,
+		"close":         2,
+		"on":            2,
+		"indeterminate": 3,
+	}
+	for value, want := range tests {
+		got, _, err := parseDoubleCommandValue(value)
+		if err != nil || got != want {
+			t.Fatalf("parseDoubleCommandValue(%q) = %d, %v; want %d, nil", value, got, err, want)
+		}
+	}
+	if _, _, err := parseDoubleCommandValue("bad"); err == nil {
+		t.Fatal("expected invalid value error")
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

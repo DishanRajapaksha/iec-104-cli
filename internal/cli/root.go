@@ -97,6 +97,8 @@ func runCommand(opts globalOptions, args []string) int {
 	switch args[0] {
 	case "single":
 		return runCommandSingle(opts, args[1:])
+	case "double":
+		return runCommandDouble(opts, args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command type %q\n", args[0])
 		return exitcode.ConfigError
@@ -196,6 +198,99 @@ func parseSingleCommandValue(value string) (bool, error) {
 			return parsed, nil
 		}
 		return false, fmt.Errorf("invalid single command value %q; expected on, off, true, false, 1, or 0", value)
+	}
+}
+
+func runCommandDouble(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("command double", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
+	ioa := uint(0)
+	rawValue := ""
+	safety := controlSafety{}
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "command timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address")
+	fs.UintVar(&ioa, "ioa", 0, "information object address")
+	fs.StringVar(&rawValue, "value", "", "double command value")
+	fs.BoolVar(&safety.DryRun, "dry-run", false, "print command without sending")
+	fs.BoolVar(&safety.Yes, "yes", false, "send the command")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if err := safety.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	if ioa == 0 {
+		fmt.Fprintln(os.Stderr, "--ioa is required")
+		return exitcode.ConfigError
+	}
+	value, label, err := parseDoubleCommandValue(rawValue)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
+
+	fmt.Fprintln(os.Stdout, "Control command: double")
+	fmt.Fprintf(os.Stdout, "Common address: %d\n", cfg.IEC104.CommonAddress)
+	fmt.Fprintf(os.Stdout, "IOA: %d\n", ioa)
+	fmt.Fprintf(os.Stdout, "Type: double\n")
+	fmt.Fprintf(os.Stdout, "Value: %s\n", label)
+	fmt.Fprintf(os.Stdout, "Qualifier: no_additional_definition\n")
+	if !safety.AllowsExecution() {
+		fmt.Fprintln(os.Stdout, "Mode: dry-run")
+		fmt.Fprintln(os.Stdout, "Result: not sent")
+		return exitcode.Success
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	if err := client.SendDoubleCommand(ctx, cfg.IEC104.CommonAddress, uint32(ioa), value); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	fmt.Fprintln(os.Stdout, "Mode: execute")
+	fmt.Fprintln(os.Stdout, "Result: sent")
+	return exitcode.Success
+}
+
+func parseDoubleCommandValue(value string) (uint8, string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "intermediate":
+		return 0, "intermediate", nil
+	case "off", "open":
+		return 1, "off", nil
+	case "on", "close":
+		return 2, "on", nil
+	case "indeterminate":
+		return 3, "indeterminate", nil
+	default:
+		return 0, "", fmt.Errorf("invalid double command value %q; expected on, off, open, close, intermediate, or indeterminate", value)
 	}
 }
 
