@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/DishanRajapaksha/iec-104-cli/internal/config"
 	"github.com/DishanRajapaksha/iec-104-cli/internal/exitcode"
 )
 
@@ -62,11 +64,38 @@ func Run(args []string) int {
 	case "version", "--version", "-v":
 		fmt.Fprintf(os.Stdout, "%s development\n", appName)
 		return exitcode.Success
+	case "validate-config":
+		return runValidateConfig(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runValidateConfig(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("validate-config", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+
+	cfg, err := config.LoadRequired(configPath, config.Overrides{OutputFormat: &opts.Format})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	fmt.Fprintln(os.Stdout, "config validation: PASS")
+	return exitcode.Success
 }
 
 func parseGlobalOptions(args []string) (globalOptions, []string, error) {
@@ -174,11 +203,11 @@ Global flags:
   --debug             Print protocol-level diagnostics to stderr
 
 Available commands:
-  help       Show this help message
-  version    Show version information
+  help             Show this help message
+  version          Show version information
+  validate-config  Validate local config without server connection
 
 Planned commands:
-  validate-config
   test-connection
   listen
   interrogate

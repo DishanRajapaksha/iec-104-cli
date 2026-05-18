@@ -138,7 +138,7 @@ iec-104-cli test-connection --host 127.0.0.1 --port 2404
 
 ## Task 4: Add `validate-config`
 
-Status: [ ]
+Status: [x]
 
 Validate local config without connecting to a server.
 

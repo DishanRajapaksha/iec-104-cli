@@ -31,6 +31,12 @@ func TestRunInvalidFormat(t *testing.T) {
 	}
 }
 
+func TestRunValidateConfigMissingFile(t *testing.T) {
+	if got := Run([]string{"validate-config", "--config", "missing-test-config.yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(validate-config missing) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {
