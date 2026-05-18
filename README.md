@@ -18,6 +18,13 @@ make docker-build
 docker run --rm iec-104-cli:latest help
 ```
 
+Build a Debian package:
+
+```bash
+make deb
+sudo apt install ./dist/iec-104-cli_0.1.0_amd64.deb
+```
+
 ## First Run
 
 Copy `config.example.yaml` to `config.yaml`, edit the connection and points, then validate it:
