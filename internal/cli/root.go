@@ -143,6 +143,8 @@ func Run(args []string) int {
 		return runValidateConfig(opts, rest[1:])
 	case "generate-configs":
 		return runGenerateConfigs(opts, rest[1:])
+	case "init-config":
+		return runGenerateConfigs(opts, rest[1:])
 	case "test-connection":
 		return runTestConnection(opts, rest[1:])
 	case "listen":
@@ -1289,6 +1291,7 @@ Available commands:
   help             Show this help message
   version          Show version information
   validate-config  Validate local config without server connection
+  init-config      Generate example config files
   generate-configs Generate example config files
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values

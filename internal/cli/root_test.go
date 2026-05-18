@@ -216,6 +216,16 @@ func TestRunGenerateConfigs(t *testing.T) {
 	}
 }
 
+func TestRunInitConfigAlias(t *testing.T) {
+	dir := t.TempDir()
+	if got := Run([]string{"init-config", "--dir", dir}); got != exitcode.Success {
+		t.Fatalf("Run(init-config) = %d, want %d", got, exitcode.Success)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "basic.yaml")); err != nil {
+		t.Fatalf("basic.yaml not generated: %v", err)
+	}
+}
+
 func TestParseGlobalOptionsValues(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{
 		"--config", "site.yaml",
