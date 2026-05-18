@@ -398,7 +398,7 @@ iec-104-cli interrogate --point active_power --format json
 
 ## Task 11: Add point lookup and filters
 
-Status: [ ]
+Status: [x]
 
 Add reusable point lookup and filtering.
 
