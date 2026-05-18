@@ -71,11 +71,87 @@ func Run(args []string) int {
 		return runValidateConfig(opts, rest[1:])
 	case "test-connection":
 		return runTestConnection(opts, rest[1:])
+	case "listen":
+		return runListen(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runListen(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("listen", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	duration := time.Duration(0)
+	commonAddress := uint(0)
+	ioa := uint(0)
+	pointName := ""
+	format := opts.Format
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "connection timeout")
+	fs.DurationVar(&duration, "duration", 0, "listen duration; 0 means until interrupted")
+	fs.UintVar(&commonAddress, "common-address", 0, "filter by common address")
+	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
+	fs.StringVar(&pointName, "point", "", "filter by configured point name")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if _, ok := allowedFormats[format]; !ok {
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	filter, err := buildPointFilter(*cfg, uint16(commonAddress), uint32(ioa), pointName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	ctx := context.Background()
+	cancel := func() {}
+	if duration > 0 {
+		ctx, cancel = context.WithTimeout(ctx, duration)
+	}
+	defer cancel()
+
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	err = client.Listen(ctx, func(value iec104.PointValue) {
+		if enriched, ok := filter(value); ok {
+			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
+				fmt.Fprintln(os.Stderr, writeErr)
+			}
+		}
+	})
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return exitcode.Success
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	return exitcode.Success
 }
 
 func runTestConnection(opts globalOptions, args []string) int {
@@ -150,6 +226,63 @@ func visitedFlags(fs *flag.FlagSet) map[string]bool {
 		visited[f.Name] = true
 	})
 	return visited
+}
+
+func applyConnectionFlagOverrides(cfg *config.Config, visited map[string]bool, host string, port int, timeout time.Duration) {
+	if visited["host"] {
+		cfg.Connection.Host = host
+	}
+	if visited["port"] {
+		cfg.Connection.Port = port
+	}
+	if visited["timeout"] && timeout > 0 {
+		cfg.Connection.Timeout = config.NewDuration(timeout)
+	}
+}
+
+func clientConfigFromConfig(cfg config.Config, debug bool) iec104.ClientConfig {
+	return iec104.ClientConfig{
+		Host:              cfg.Connection.Host,
+		Port:              cfg.Connection.Port,
+		Timeout:           cfg.Connection.Timeout.Duration(),
+		Reconnect:         cfg.Connection.Reconnect,
+		ReconnectInterval: cfg.Connection.ReconnectInterval.Duration(),
+		OriginatorAddress: cfg.IEC104.OriginatorAddress,
+		Debug:             debug,
+	}
+}
+
+func buildPointFilter(cfg config.Config, commonAddress uint16, ioa uint32, pointName string) (func(iec104.PointValue) (iec104.PointValue, bool), error) {
+	pointsByName := map[string]config.PointConfig{}
+	pointsByIOA := map[uint32]config.PointConfig{}
+	for _, point := range cfg.Points {
+		pointsByName[point.Name] = point
+		pointsByIOA[point.IOA] = point
+	}
+	if pointName != "" {
+		point, ok := pointsByName[pointName]
+		if !ok {
+			return nil, fmt.Errorf("unknown point %q", pointName)
+		}
+		ioa = point.IOA
+	}
+
+	return func(value iec104.PointValue) (iec104.PointValue, bool) {
+		if commonAddress != 0 && value.CommonAddress != commonAddress {
+			return value, false
+		}
+		if ioa != 0 && value.IOA != ioa {
+			return value, false
+		}
+		if point, ok := pointsByIOA[value.IOA]; ok {
+			value.Name = point.Name
+			value.Unit = point.Unit
+			if value.Type == "" {
+				value.Type = point.Type
+			}
+		}
+		return value, true
+	}, nil
 }
 
 func mapRunError(err error) int {
@@ -297,9 +430,9 @@ Available commands:
   version          Show version information
   validate-config  Validate local config without server connection
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
+  listen           Print incoming point values
 
 Planned commands:
-  listen
   interrogate
   watch
   read

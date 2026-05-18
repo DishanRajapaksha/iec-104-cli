@@ -325,7 +325,7 @@ Expected behaviour:
 
 ## Task 9: Add `listen`
 
-Status: [ ]
+Status: [x]
 
 Implement passive event listening.
 

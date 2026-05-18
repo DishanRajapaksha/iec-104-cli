@@ -43,6 +43,12 @@ func TestRunTestConnectionRequiresHost(t *testing.T) {
 	}
 }
 
+func TestRunListenRejectsUnknownFormat(t *testing.T) {
+	if got := Run([]string{"listen", "--format", "yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(listen invalid format) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {
