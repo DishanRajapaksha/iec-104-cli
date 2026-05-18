@@ -44,6 +44,9 @@ func Validate(cfg Config) error {
 	if !allowedOutputFormats[strings.ToLower(strings.TrimSpace(cfg.Output.Format))] {
 		return fmt.Errorf("%w: unsupported output format %q", ErrConfig, cfg.Output.Format)
 	}
+	if cfg.Cache.Enabled && strings.TrimSpace(cfg.Cache.Path) == "" {
+		return fmt.Errorf("%w: cache.path is required when cache is enabled", ErrConfig)
+	}
 
 	names := map[string]struct{}{}
 	for i, point := range cfg.Points {

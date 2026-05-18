@@ -55,6 +55,7 @@ type Config struct {
 	Connection ConnectionConfig `yaml:"connection"`
 	IEC104     IEC104Config     `yaml:"iec104"`
 	Output     OutputConfig     `yaml:"output"`
+	Cache      CacheConfig      `yaml:"cache"`
 	PointFiles []string         `yaml:"point_files"`
 	Points     []PointConfig    `yaml:"points"`
 }
@@ -76,6 +77,11 @@ type IEC104Config struct {
 type OutputConfig struct {
 	Format     string `yaml:"format"`
 	Timestamps string `yaml:"timestamps"`
+}
+
+type CacheConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Path    string `yaml:"path"`
 }
 
 type PointConfig struct {
@@ -109,6 +115,10 @@ func Default() Config {
 		Output: OutputConfig{
 			Format:     DefaultFormat,
 			Timestamps: "local",
+		},
+		Cache: CacheConfig{
+			Enabled: true,
+			Path:    ".iec-104-cli/cache.json",
 		},
 	}
 }
@@ -276,6 +286,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Output.Timestamps == "" {
 		cfg.Output.Timestamps = defaults.Output.Timestamps
+	}
+	if cfg.Cache.Path == "" {
+		cfg.Cache.Path = defaults.Cache.Path
 	}
 }
 

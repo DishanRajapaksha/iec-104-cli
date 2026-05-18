@@ -14,6 +14,10 @@ output:
   format: table
   timestamps: local
 
+cache:
+  enabled: true
+  path: .iec-104-cli/cache.json
+
 # Optional external point files. Supported formats:
 # - CSV with columns: name,ioa,type,unit
 # - YAML as a list of points or an object with a points key

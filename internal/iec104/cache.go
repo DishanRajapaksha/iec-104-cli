@@ -30,6 +30,7 @@ func (c *LatestCache) Snapshot(now time.Time, staleAfter time.Duration) []PointV
 	defer c.mu.RUnlock()
 	values := make([]PointValue, 0, len(c.values))
 	for _, value := range c.values {
+		value.Stale = false
 		if staleAfter > 0 && !value.Timestamp.IsZero() && now.Sub(value.Timestamp) > staleAfter {
 			value.Stale = true
 		}

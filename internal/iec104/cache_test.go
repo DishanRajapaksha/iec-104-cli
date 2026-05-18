@@ -36,3 +36,21 @@ func TestLatestCacheUpdateReplacesSameKey(t *testing.T) {
 		t.Fatalf("value = %v, want 2", values[0].Value)
 	}
 }
+
+func TestLatestCacheSnapshotRecomputesStale(t *testing.T) {
+	cache := NewLatestCache()
+	cache.Update(PointValue{
+		Timestamp:     time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC),
+		CommonAddress: 1,
+		IOA:           1001,
+		Stale:         true,
+	})
+
+	values := cache.Snapshot(time.Date(2026, 5, 18, 12, 0, 1, 0, time.UTC), 30*time.Second)
+	if len(values) != 1 {
+		t.Fatalf("snapshot length = %d, want 1", len(values))
+	}
+	if values[0].Stale {
+		t.Fatal("value remained stale after fresh snapshot")
+	}
+}

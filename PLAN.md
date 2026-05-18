@@ -386,6 +386,7 @@ TIME                  CA  IOA   NAME          TYPE       VALUE  UNIT  CAUSE     
 ### Milestone 3: latest-value workflows
 
 - latest-value cache
+- persistent latest-value cache
 - `watch`
 - stale markers
 - configured point names and units
@@ -410,7 +411,6 @@ TIME                  CA  IOA   NAME          TYPE       VALUE  UNIT  CAUSE     
 
 - IEC 101 support
 - full IEC 62351 security support
-- persistent local cache
 - daemon mode
 - GUI
 - Modbus-style register mapping

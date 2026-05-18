@@ -38,6 +38,10 @@ output:
   format: table
   timestamps: local
 
+cache:
+  enabled: true
+  path: .iec-104-cli/cache.json
+
 points:
   - name: active_power
     ioa: 1001
@@ -63,6 +67,10 @@ iec104:
 output:
   format: csv
   timestamps: local
+
+cache:
+  enabled: true
+  path: .iec-104-cli/cache.json
 
 point_files:
   - points.csv
@@ -674,6 +682,8 @@ func runWatch(opts globalOptions, args []string) int {
 	staleAfter := 30 * time.Second
 	ioa := uint(0)
 	pointName := ""
+	cachePath := ""
+	noCache := false
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
@@ -687,6 +697,8 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.DurationVar(&staleAfter, "stale-after", staleAfter, "mark values stale after this age")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
+	fs.StringVar(&cachePath, "cache", "", "persistent latest-value cache path")
+	fs.BoolVar(&noCache, "no-cache", false, "disable persistent latest-value cache")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
@@ -716,7 +728,14 @@ func runWatch(opts globalOptions, args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
-	applyConnectionFlagOverrides(cfg, visitedFlags(fs), host, port, timeout)
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["cache"] {
+		cfg.Cache.Path = cachePath
+	}
+	if visited["no-cache"] {
+		cfg.Cache.Enabled = !noCache
+	}
 	if err := config.Validate(*cfg); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -730,12 +749,28 @@ func runWatch(opts globalOptions, args []string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cache := iec104.NewLatestCache()
+	var cacheStore *iec104.PersistentCache
+	if cfg.Cache.Enabled {
+		cacheStore = iec104.NewPersistentCache(cfg.Cache.Path)
+		cachedValues, err := cacheStore.Load()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.ConfigError
+		}
+		cache.Seed(cachedValues)
+		logVerbose(opts, "loaded %d cached point values from %s", len(cachedValues), cfg.Cache.Path)
+	}
 	errCh := make(chan error, 1)
 	logVerbose(opts, "starting watch on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
-	logDebug(opts, "watch interval=%s stale_after=%s ioa=%d point=%q format=%s", interval, staleAfter, ioa, pointName, format)
+	logDebug(opts, "watch interval=%s stale_after=%s ioa=%d point=%q format=%s cache_enabled=%t cache_path=%q", interval, staleAfter, ioa, pointName, format, cfg.Cache.Enabled, cfg.Cache.Path)
 	go func() {
 		errCh <- runListenWithReconnect(ctx, *cfg, opts, "watch", func(value iec104.PointValue) {
 			cache.Update(value)
+			if cacheStore != nil {
+				if err := cache.SaveTo(cacheStore); err != nil {
+					fmt.Fprintln(os.Stderr, err)
+				}
+			}
 		})
 	}()
 

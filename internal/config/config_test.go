@@ -22,6 +22,12 @@ func TestLoadMissingUsesDefaults(t *testing.T) {
 	if cfg.Output.Format != DefaultFormat {
 		t.Fatalf("format = %q, want %q", cfg.Output.Format, DefaultFormat)
 	}
+	if !cfg.Cache.Enabled {
+		t.Fatalf("cache enabled = false, want true")
+	}
+	if cfg.Cache.Path != ".iec-104-cli/cache.json" {
+		t.Fatalf("cache path = %q, want default", cfg.Cache.Path)
+	}
 }
 
 func TestLoadFileWithOverrides(t *testing.T) {

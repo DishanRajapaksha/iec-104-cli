@@ -55,6 +55,10 @@ output:
   format: table
   timestamps: local
 
+cache:
+  enabled: true
+  path: .iec-104-cli/cache.json
+
 points:
   - name: active_power
     ioa: 1001
@@ -93,6 +97,8 @@ Watch the latest value cache:
 
 ```bash
 iec-104-cli watch --point active_power --interval 1s --format jsonl
+iec-104-cli watch --cache .iec-104-cli/cache.json
+iec-104-cli watch --no-cache
 ```
 
 Read a specific IOA:
