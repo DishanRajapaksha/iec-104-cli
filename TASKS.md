@@ -737,7 +737,7 @@ Acceptance:
 
 ## Task 23: Add integration tests with local server
 
-Status: [ ]
+Status: [x]
 
 Use the backend library server package or a lightweight fake server to test behaviour.
 

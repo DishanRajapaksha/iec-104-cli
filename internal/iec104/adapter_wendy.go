@@ -36,7 +36,22 @@ func (c *WendyClient) Connect(ctx context.Context) error {
 	settings.Params.OrigAddress = asdu.OriginAddr(c.cfg.OriginatorAddress)
 
 	c.client = wendyclient.New(settings, &wendyCallback{events: c.events})
-	return runWithContext(ctx, c.client.Connect, mapWendyError)
+	active := make(chan struct{}, 1)
+	c.client.SetServerActiveHandler(func(*wendyclient.Client) {
+		select {
+		case active <- struct{}{}:
+		default:
+		}
+	})
+	if err := runWithContext(ctx, c.client.Connect, mapWendyError); err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-active:
+		return nil
+	}
 }
 
 func (c *WendyClient) Close() error {

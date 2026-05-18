@@ -75,6 +75,12 @@ func TestRunCommandSingleDefaultsToDryRun(t *testing.T) {
 	}
 }
 
+func TestCommandDryRunDoesNotRequireServer(t *testing.T) {
+	if got := Run([]string{"command", "single", "--config", "missing.yaml", "--ioa", "1000", "--value", "on", "--dry-run"}); got != exitcode.Success {
+		t.Fatalf("Run(command dry run without server) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestParseSingleCommandValue(t *testing.T) {
 	for _, value := range []string{"on", "true", "1"} {
 		got, err := parseSingleCommandValue(value)
