@@ -840,10 +840,9 @@ func runListen(opts globalOptions, args []string) int {
 	}
 	defer cancel()
 
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
 	logVerbose(opts, "listening on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "listen duration=%s common_address=%d ioa=%d point=%q format=%s", duration, commonAddress, ioa, pointName, format)
-	err = client.Listen(ctx, func(value iec104.PointValue) {
+	err = listenWithReconnect(ctx, *cfg, opts, func(value iec104.PointValue) {
 		if enriched, ok := filter(value); ok {
 			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
 				fmt.Fprintln(os.Stderr, writeErr)
@@ -858,6 +857,27 @@ func runListen(opts globalOptions, args []string) int {
 		return mapRunError(err)
 	}
 	return exitcode.Success
+}
+
+func listenWithReconnect(ctx context.Context, cfg config.Config, opts globalOptions, handler func(iec104.PointValue)) error {
+	for {
+		client := iec104.NewWendyClient(clientConfigFromConfig(cfg, opts.Debug))
+		err := client.Listen(ctx, handler)
+		_ = client.Close()
+		if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		if !cfg.Connection.Reconnect {
+			return err
+		}
+		interval := cfg.Connection.ReconnectInterval.Duration()
+		logVerbose(opts, "listen disconnected: %v; reconnecting in %s", err, interval)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+		}
+	}
 }
 
 func runTestConnection(opts globalOptions, args []string) int {
