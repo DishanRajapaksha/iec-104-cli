@@ -177,7 +177,7 @@ Expected result: exit code 0 and a short success message.
 
 ## Task 5: Add output formatting package
 
-Status: [ ]
+Status: [x]
 
 Implement output helpers for table, text, JSON, and JSONL.
 
