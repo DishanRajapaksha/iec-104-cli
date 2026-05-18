@@ -157,6 +157,8 @@ func runClockSync(opts globalOptions, args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	logVerbose(opts, "sending clock sync to common address %d", cfg.IEC104.CommonAddress)
+	logDebug(opts, "clock-sync time=%s", syncTime.Format(time.RFC3339))
 	if err := client.SyncClock(ctx, cfg.IEC104.CommonAddress, syncTime); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return mapRunError(err)
@@ -249,6 +251,8 @@ func runSetpointKind(opts globalOptions, kind string, args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	logVerbose(opts, "sending %s setpoint to IOA %d", kind, ioa)
+	logDebug(opts, "setpoint common_address=%d value=%v", cfg.IEC104.CommonAddress, value)
 	if err := client.SendSetpoint(ctx, cfg.IEC104.CommonAddress, uint32(ioa), kind, value); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return mapRunError(err)
@@ -505,6 +509,8 @@ func runRead(opts globalOptions, args []string) int {
 	commonAddress := uint(0)
 	ioa := uint(0)
 	format := opts.Format
+	verbose := opts.Verbose
+	debug := opts.Debug
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -513,9 +519,13 @@ func runRead(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "common address")
 	fs.UintVar(&ioa, "ioa", 0, "information object address to read")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
+	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	opts.Verbose = verbose
+	opts.Debug = debug
 	_ = profile
 	if ioa == 0 {
 		fmt.Fprintln(os.Stderr, "--ioa is required")
@@ -583,6 +593,8 @@ func runWatch(opts globalOptions, args []string) int {
 	ioa := uint(0)
 	pointName := ""
 	format := opts.Format
+	verbose := opts.Verbose
+	debug := opts.Debug
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -593,9 +605,13 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
+	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	opts.Verbose = verbose
+	opts.Debug = debug
 	_ = profile
 	if interval <= 0 {
 		fmt.Fprintln(os.Stderr, "--interval must be positive")
@@ -631,6 +647,8 @@ func runWatch(opts globalOptions, args []string) int {
 	cache := iec104.NewLatestCache()
 	errCh := make(chan error, 1)
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	logVerbose(opts, "starting watch on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
+	logDebug(opts, "watch interval=%s stale_after=%s ioa=%d point=%q format=%s", interval, staleAfter, ioa, pointName, format)
 	go func() {
 		errCh <- client.Listen(ctx, func(value iec104.PointValue) {
 			cache.Update(value)
@@ -675,6 +693,8 @@ func runInterrogate(opts globalOptions, args []string) int {
 	ioa := uint(0)
 	pointName := ""
 	format := opts.Format
+	verbose := opts.Verbose
+	debug := opts.Debug
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -684,9 +704,13 @@ func runInterrogate(opts globalOptions, args []string) int {
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
+	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	opts.Verbose = verbose
+	opts.Debug = debug
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
@@ -716,6 +740,8 @@ func runInterrogate(opts globalOptions, args []string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	logVerbose(opts, "interrogating common address %d on %s:%d", cfg.IEC104.CommonAddress, cfg.Connection.Host, cfg.Connection.Port)
+	logDebug(opts, "interrogate ioa=%d point=%q format=%s", ioa, pointName, format)
 	values, err := client.Interrogate(ctx, cfg.IEC104.CommonAddress)
 	filtered := make([]iec104.PointValue, 0, len(values))
 	for _, value := range values {
@@ -751,6 +777,8 @@ func runListen(opts globalOptions, args []string) int {
 	ioa := uint(0)
 	pointName := ""
 	format := opts.Format
+	verbose := opts.Verbose
+	debug := opts.Debug
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -761,9 +789,13 @@ func runListen(opts globalOptions, args []string) int {
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
+	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	opts.Verbose = verbose
+	opts.Debug = debug
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
@@ -795,6 +827,8 @@ func runListen(opts globalOptions, args []string) int {
 	defer cancel()
 
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	logVerbose(opts, "listening on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
+	logDebug(opts, "listen duration=%s common_address=%d ioa=%d point=%q format=%s", duration, commonAddress, ioa, pointName, format)
 	err = client.Listen(ctx, func(value iec104.PointValue) {
 		if enriched, ok := filter(value); ok {
 			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
@@ -820,14 +854,20 @@ func runTestConnection(opts globalOptions, args []string) int {
 	host := ""
 	port := 0
 	timeout := opts.Timeout
+	verbose := opts.Verbose
+	debug := opts.Debug
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
 	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
 	fs.DurationVar(&timeout, "timeout", timeout, "connection timeout")
+	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
+	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	opts.Verbose = verbose
+	opts.Debug = debug
 	_ = profile
 
 	cfg, _, err := config.Load(configPath, config.Overrides{})
@@ -852,6 +892,7 @@ func runTestConnection(opts globalOptions, args []string) int {
 
 	fmt.Fprintf(os.Stdout, "Host: %s\n", cfg.Connection.Host)
 	fmt.Fprintf(os.Stdout, "Port: %d\n", cfg.Connection.Port)
+	logVerbose(opts, "testing connection to %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
@@ -865,6 +906,7 @@ func runTestConnection(opts globalOptions, args []string) int {
 		Debug:             opts.Debug,
 	})
 	if err := client.TestConnection(ctx); err != nil {
+		logDebug(opts, "test-connection failed: %v", err)
 		fmt.Fprintf(os.Stdout, "TCP: failed\n")
 		fmt.Fprintf(os.Stdout, "IEC104 STARTDT: not started\n")
 		fmt.Fprintf(os.Stdout, "Result: failed\n")
@@ -875,6 +917,7 @@ func runTestConnection(opts globalOptions, args []string) int {
 	fmt.Fprintf(os.Stdout, "TCP: ok\n")
 	fmt.Fprintf(os.Stdout, "IEC104 STARTDT: ok\n")
 	fmt.Fprintf(os.Stdout, "Result: connected\n")
+	logVerbose(opts, "connection test succeeded")
 	return exitcode.Success
 }
 

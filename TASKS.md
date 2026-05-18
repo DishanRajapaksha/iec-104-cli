@@ -629,7 +629,7 @@ iec-104-cli clock-sync --time 2026-05-18T12:00:00Z --dry-run
 
 ## Task 19: Add verbose and debug logging
 
-Status: [ ]
+Status: [x]
 
 Implement logging flags.
 

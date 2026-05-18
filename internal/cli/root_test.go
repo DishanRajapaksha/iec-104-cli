@@ -150,6 +150,12 @@ func TestRunClockSyncDryRunWithTime(t *testing.T) {
 	}
 }
 
+func TestRunVerboseDoesNotChangeExitCode(t *testing.T) {
+	if got := Run([]string{"test-connection", "--verbose", "--config", "missing-test-config.yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(verbose missing config) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {
