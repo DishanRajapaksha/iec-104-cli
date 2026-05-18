@@ -10,6 +10,7 @@ var allowedOutputFormats = map[string]bool{
 	"text":  true,
 	"json":  true,
 	"jsonl": true,
+	"csv":   true,
 }
 
 var allowedPointTypes = map[string]bool{

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -76,5 +77,25 @@ func TestWritePointValuesJSONL(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &decoded); err != nil {
 			t.Fatalf("JSONL line is invalid JSON: %v", err)
 		}
+	}
+}
+
+func TestWritePointValuesCSV(t *testing.T) {
+	var out bytes.Buffer
+	if err := writePointValues(&out, "csv", []iec104.PointValue{samplePointValue()}); err != nil {
+		t.Fatalf("writePointValues returned error: %v", err)
+	}
+	records, err := csv.NewReader(strings.NewReader(out.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("CSV output is invalid: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("CSV record count = %d, want 2; output %q", len(records), out.String())
+	}
+	if got, want := records[0][0], "time"; got != want {
+		t.Fatalf("CSV header[0] = %q, want %q", got, want)
+	}
+	if got, want := records[1][3], "active_power"; got != want {
+		t.Fatalf("CSV name = %q, want %q", got, want)
 	}
 }

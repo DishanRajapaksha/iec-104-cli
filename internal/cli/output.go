@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -26,6 +28,8 @@ func writePointValues(w io.Writer, format string, values []iec104.PointValue) er
 			}
 		}
 		return nil
+	case "csv":
+		return writePointValueCSV(w, values)
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}
@@ -73,6 +77,30 @@ func writePointValueText(w io.Writer, values []iec104.PointValue) error {
 		}
 	}
 	return nil
+}
+
+func writePointValueCSV(w io.Writer, values []iec104.PointValue) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write([]string{"time", "common_address", "ioa", "name", "type", "value", "unit", "cause", "quality"}); err != nil {
+		return err
+	}
+	for _, value := range values {
+		if err := cw.Write([]string{
+			formatPointTime(value.Timestamp),
+			strconv.FormatUint(uint64(value.CommonAddress), 10),
+			strconv.FormatUint(uint64(value.IOA), 10),
+			value.Name,
+			value.Type,
+			fmt.Sprint(value.Value),
+			value.Unit,
+			value.Cause,
+			value.Quality.Display(),
+		}); err != nil {
+			return err
+		}
+	}
+	cw.Flush()
+	return cw.Error()
 }
 
 func formatPointTime(t time.Time) string {

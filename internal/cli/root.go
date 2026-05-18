@@ -26,6 +26,7 @@ var allowedFormats = map[string]struct{}{
 	"text":  {},
 	"json":  {},
 	"jsonl": {},
+	"csv":   {},
 }
 
 type globalOptions struct {
@@ -534,7 +535,7 @@ func runRead(opts globalOptions, args []string) int {
 	fs.DurationVar(&timeout, "timeout", timeout, "read timeout")
 	fs.UintVar(&commonAddress, "common-address", 0, "common address")
 	fs.UintVar(&ioa, "ioa", 0, "information object address to read")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -550,7 +551,7 @@ func runRead(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
@@ -623,7 +624,7 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.DurationVar(&staleAfter, "stale-after", staleAfter, "mark values stale after this age")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -643,7 +644,7 @@ func runWatch(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
@@ -724,7 +725,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "common address to interrogate")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -736,7 +737,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 	opts.DumpFrames = dumpFrames
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
@@ -812,7 +813,7 @@ func runListen(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "filter by common address")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -824,7 +825,7 @@ func runListen(opts globalOptions, args []string) int {
 	opts.DumpFrames = dumpFrames
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
@@ -1087,7 +1088,7 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 				return opts, nil, err
 			}
 			if _, ok := allowedFormats[v]; !ok {
-				return opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl", v)
+				return opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl, csv", v)
 			}
 			opts.Format = v
 			i = next
@@ -1148,7 +1149,7 @@ Usage:
 Global flags:
   --config string     Config file path (default "config.yaml")
   --profile string    Config profile name
-  --format string     Output format: table, text, json, jsonl (default "table")
+  --format string     Output format: table, text, json, jsonl, csv (default "table")
   --timeout duration  Operation timeout, for example 10s or 1m
   --verbose           Print high-level diagnostics to stderr
   --debug             Print protocol-level diagnostics to stderr
