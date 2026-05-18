@@ -760,7 +760,7 @@ Tests must not require external network access.
 
 ## Task 24: Add release build workflow
 
-Status: [ ]
+Status: [x]
 
 Add cross-platform release builds later, after the CLI stabilises.
 
