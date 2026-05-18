@@ -293,7 +293,7 @@ go test ./...
 
 ## Task 8: Add `test-connection`
 
-Status: [ ]
+Status: [x]
 
 Implement connection testing.
 

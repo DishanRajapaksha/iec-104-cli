@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -9,6 +11,7 @@ import (
 
 	"github.com/DishanRajapaksha/iec-104-cli/internal/config"
 	"github.com/DishanRajapaksha/iec-104-cli/internal/exitcode"
+	"github.com/DishanRajapaksha/iec-104-cli/internal/iec104"
 )
 
 const (
@@ -66,9 +69,96 @@ func Run(args []string) int {
 		return exitcode.Success
 	case "validate-config":
 		return runValidateConfig(opts, rest[1:])
+	case "test-connection":
+		return runTestConnection(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
+		return exitcode.GeneralError
+	}
+}
+
+func runTestConnection(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("test-connection", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "connection timeout")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	if visited["host"] {
+		cfg.Connection.Host = host
+	}
+	if visited["port"] {
+		cfg.Connection.Port = port
+	}
+	if visited["timeout"] || opts.Timeout > 0 {
+		cfg.Connection.Timeout = config.NewDuration(timeout)
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	fmt.Fprintf(os.Stdout, "Host: %s\n", cfg.Connection.Host)
+	fmt.Fprintf(os.Stdout, "Port: %d\n", cfg.Connection.Port)
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(iec104.ClientConfig{
+		Host:              cfg.Connection.Host,
+		Port:              cfg.Connection.Port,
+		Timeout:           cfg.Connection.Timeout.Duration(),
+		Reconnect:         false,
+		ReconnectInterval: cfg.Connection.ReconnectInterval.Duration(),
+		OriginatorAddress: cfg.IEC104.OriginatorAddress,
+		Debug:             opts.Debug,
+	})
+	if err := client.TestConnection(ctx); err != nil {
+		fmt.Fprintf(os.Stdout, "TCP: failed\n")
+		fmt.Fprintf(os.Stdout, "IEC104 STARTDT: not started\n")
+		fmt.Fprintf(os.Stdout, "Result: failed\n")
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+
+	fmt.Fprintf(os.Stdout, "TCP: ok\n")
+	fmt.Fprintf(os.Stdout, "IEC104 STARTDT: ok\n")
+	fmt.Fprintf(os.Stdout, "Result: connected\n")
+	return exitcode.Success
+}
+
+func visitedFlags(fs *flag.FlagSet) map[string]bool {
+	visited := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) {
+		visited[f.Name] = true
+	})
+	return visited
+}
+
+func mapRunError(err error) int {
+	switch {
+	case errors.Is(err, iec104.ErrTCPConnection), errors.Is(err, context.DeadlineExceeded):
+		return exitcode.TCPConnectionError
+	case errors.Is(err, iec104.ErrSession):
+		return exitcode.IEC104SessionError
+	default:
 		return exitcode.GeneralError
 	}
 }
@@ -206,9 +296,9 @@ Available commands:
   help             Show this help message
   version          Show version information
   validate-config  Validate local config without server connection
+  test-connection  Run TCP and IEC 104 STARTDT diagnostics
 
 Planned commands:
-  test-connection
   listen
   interrogate
   watch
