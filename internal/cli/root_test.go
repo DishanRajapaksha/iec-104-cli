@@ -156,6 +156,12 @@ func TestRunVerboseDoesNotChangeExitCode(t *testing.T) {
 	}
 }
 
+func TestRunCompletionsBash(t *testing.T) {
+	if got := Run([]string{"completions", "bash"}); got != exitcode.Success {
+		t.Fatalf("Run(completions bash) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

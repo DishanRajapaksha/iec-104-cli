@@ -649,7 +649,7 @@ iec-104-cli listen --debug --format jsonl
 
 ## Task 20: Add shell completions
 
-Status: [ ]
+Status: [x]
 
 Generate shell completions.
 

@@ -86,11 +86,25 @@ func Run(args []string) int {
 		return runSetpoint(opts, rest[1:])
 	case "clock-sync":
 		return runClockSync(opts, rest[1:])
+	case "completions":
+		return runCompletions(rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runCompletions(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: iec-104-cli completions bash|zsh")
+		return exitcode.ConfigError
+	}
+	if err := writeCompletion(os.Stdout, args[0]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	return exitcode.Success
 }
 
 func runClockSync(opts globalOptions, args []string) int {
@@ -1105,8 +1119,6 @@ Available commands:
   command          Run control commands with dry-run safety
   setpoint         Run setpoint commands with dry-run safety
   clock-sync       Run clock synchronization with dry-run safety
-
-Planned commands:
   completions
 
 `, appName, appName)
