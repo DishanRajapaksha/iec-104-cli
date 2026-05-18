@@ -35,6 +35,7 @@ type globalOptions struct {
 	Timeout    time.Duration
 	Verbose    bool
 	Debug      bool
+	DumpFrames bool
 }
 
 func defaultGlobalOptions() globalOptions {
@@ -170,7 +171,7 @@ func runClockSync(opts globalOptions, args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	logVerbose(opts, "sending clock sync to common address %d", cfg.IEC104.CommonAddress)
 	logDebug(opts, "clock-sync time=%s", syncTime.Format(time.RFC3339))
 	if err := client.SyncClock(ctx, cfg.IEC104.CommonAddress, syncTime); err != nil {
@@ -264,7 +265,7 @@ func runSetpointKind(opts globalOptions, kind string, args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	logVerbose(opts, "sending %s setpoint to IOA %d", kind, ioa)
 	logDebug(opts, "setpoint common_address=%d value=%v", cfg.IEC104.CommonAddress, value)
 	if err := client.SendSetpoint(ctx, cfg.IEC104.CommonAddress, uint32(ioa), kind, value); err != nil {
@@ -395,7 +396,7 @@ func runCommandSingle(opts globalOptions, args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	if err := client.SendSingleCommand(ctx, cfg.IEC104.CommonAddress, uint32(ioa), value); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return mapRunError(err)
@@ -487,7 +488,7 @@ func runCommandDouble(opts globalOptions, args []string) int {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	if err := client.SendDoubleCommand(ctx, cfg.IEC104.CommonAddress, uint32(ioa), value); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return mapRunError(err)
@@ -525,6 +526,7 @@ func runRead(opts globalOptions, args []string) int {
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
+	dumpFrames := opts.DumpFrames
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -535,11 +537,13 @@ func runRead(opts globalOptions, args []string) int {
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
+	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
+	opts.DumpFrames = dumpFrames
 	_ = profile
 	if ioa == 0 {
 		fmt.Fprintln(os.Stderr, "--ioa is required")
@@ -572,7 +576,7 @@ func runRead(opts globalOptions, args []string) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	value, err := client.Read(ctx, cfg.IEC104.CommonAddress, uint32(ioa))
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		fmt.Fprintf(os.Stderr, "read timed out waiting for IOA %d; some IEC 104 devices do not support read and expect interrogation or spontaneous updates instead\n", ioa)
@@ -609,6 +613,7 @@ func runWatch(opts globalOptions, args []string) int {
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
+	dumpFrames := opts.DumpFrames
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -621,11 +626,13 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
+	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
+	opts.DumpFrames = dumpFrames
 	_ = profile
 	if interval <= 0 {
 		fmt.Fprintln(os.Stderr, "--interval must be positive")
@@ -708,6 +715,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
+	dumpFrames := opts.DumpFrames
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -719,11 +727,13 @@ func runInterrogate(opts globalOptions, args []string) int {
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
+	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
+	opts.DumpFrames = dumpFrames
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
@@ -752,7 +762,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
 	logVerbose(opts, "interrogating common address %d on %s:%d", cfg.IEC104.CommonAddress, cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "interrogate ioa=%d point=%q format=%s", ioa, pointName, format)
 	values, err := client.Interrogate(ctx, cfg.IEC104.CommonAddress)
@@ -792,6 +802,7 @@ func runListen(opts globalOptions, args []string) int {
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
+	dumpFrames := opts.DumpFrames
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -804,11 +815,13 @@ func runListen(opts globalOptions, args []string) int {
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
+	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
+	opts.DumpFrames = dumpFrames
 	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
@@ -860,7 +873,7 @@ func runListen(opts globalOptions, args []string) int {
 
 func runListenWithReconnect(ctx context.Context, cfg config.Config, opts globalOptions, label string, handler func(iec104.PointValue)) error {
 	for {
-		client := iec104.NewWendyClient(clientConfigFromConfig(cfg, opts.Debug))
+		client := iec104.NewWendyClient(clientConfigFromConfig(cfg, opts))
 		err := client.Listen(ctx, handler)
 		_ = client.Close()
 		if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -889,6 +902,7 @@ func runTestConnection(opts globalOptions, args []string) int {
 	timeout := opts.Timeout
 	verbose := opts.Verbose
 	debug := opts.Debug
+	dumpFrames := opts.DumpFrames
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	fs.StringVar(&host, "host", "", "IEC 104 server host")
@@ -896,11 +910,13 @@ func runTestConnection(opts globalOptions, args []string) int {
 	fs.DurationVar(&timeout, "timeout", timeout, "connection timeout")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
+	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
+	opts.DumpFrames = dumpFrames
 	_ = profile
 
 	cfg, _, err := config.Load(configPath, config.Overrides{})
@@ -974,7 +990,7 @@ func applyConnectionFlagOverrides(cfg *config.Config, visited map[string]bool, h
 	}
 }
 
-func clientConfigFromConfig(cfg config.Config, debug bool) iec104.ClientConfig {
+func clientConfigFromConfig(cfg config.Config, opts globalOptions) iec104.ClientConfig {
 	return iec104.ClientConfig{
 		Host:              cfg.Connection.Host,
 		Port:              cfg.Connection.Port,
@@ -982,7 +998,8 @@ func clientConfigFromConfig(cfg config.Config, debug bool) iec104.ClientConfig {
 		Reconnect:         cfg.Connection.Reconnect,
 		ReconnectInterval: cfg.Connection.ReconnectInterval.Duration(),
 		OriginatorAddress: cfg.IEC104.OriginatorAddress,
-		Debug:             debug,
+		Debug:             opts.Debug,
+		DumpFrames:        opts.DumpFrames,
 	}
 }
 
@@ -1092,6 +1109,8 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 			opts.Verbose = true
 		case "--debug":
 			opts.Debug = true
+		case "--dump-frames":
+			opts.DumpFrames = true
 		case "--help", "-h", "--version", "-v":
 			rest = append(rest, arg)
 			rest = append(rest, args[i+1:]...)
@@ -1133,6 +1152,7 @@ Global flags:
   --timeout duration  Operation timeout, for example 10s or 1m
   --verbose           Print high-level diagnostics to stderr
   --debug             Print protocol-level diagnostics to stderr
+  --dump-frames       Dump protocol frames to stderr
 
 Available commands:
   help             Show this help message

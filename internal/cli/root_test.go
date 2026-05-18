@@ -210,6 +210,7 @@ func TestParseGlobalOptionsValues(t *testing.T) {
 		"--timeout", "15s",
 		"--verbose",
 		"--debug",
+		"--dump-frames",
 		"listen",
 	})
 	if err != nil {
@@ -232,6 +233,9 @@ func TestParseGlobalOptionsValues(t *testing.T) {
 	}
 	if !opts.Debug {
 		t.Fatalf("Debug = false, want true")
+	}
+	if !opts.DumpFrames {
+		t.Fatalf("DumpFrames = false, want true")
 	}
 	if len(rest) != 1 || rest[0] != "listen" {
 		t.Fatalf("rest = %#v, want [listen]", rest)

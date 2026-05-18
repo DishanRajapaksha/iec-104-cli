@@ -26,4 +26,5 @@ type ClientConfig struct {
 	ReconnectInterval time.Duration
 	OriginatorAddress uint8
 	Debug             bool
+	DumpFrames        bool
 }

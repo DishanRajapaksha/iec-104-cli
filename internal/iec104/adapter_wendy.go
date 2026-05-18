@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"github.com/wendy512/go-iecp5/asdu"
+	"github.com/wendy512/go-iecp5/clog"
 	wendyclient "github.com/wendy512/iec104/client"
 )
 
@@ -34,6 +37,12 @@ func (c *WendyClient) Connect(ctx context.Context) error {
 	}
 	settings.Params = asdu.ParamsWide
 	settings.Params.OrigAddress = asdu.OriginAddr(c.cfg.OriginatorAddress)
+	if c.cfg.DumpFrames {
+		settings.LogCfg = &wendyclient.LogCfg{
+			Enable:      true,
+			LogProvider: frameDumpLogger{logger: log.New(os.Stderr, "frame: ", log.LstdFlags)},
+		}
+	}
 
 	c.client = wendyclient.New(settings, &wendyCallback{events: c.events})
 	active := make(chan struct{}, 1)
@@ -52,6 +61,28 @@ func (c *WendyClient) Connect(ctx context.Context) error {
 	case <-active:
 		return nil
 	}
+}
+
+type frameDumpLogger struct {
+	logger *log.Logger
+}
+
+var _ clog.LogProvider = frameDumpLogger{}
+
+func (l frameDumpLogger) Critical(format string, v ...interface{}) {
+	l.logger.Printf("[C] "+format, v...)
+}
+
+func (l frameDumpLogger) Error(format string, v ...interface{}) {
+	l.logger.Printf("[E] "+format, v...)
+}
+
+func (l frameDumpLogger) Warn(format string, v ...interface{}) {
+	l.logger.Printf("[W] "+format, v...)
+}
+
+func (l frameDumpLogger) Debug(format string, v ...interface{}) {
+	l.logger.Printf("[D] "+format, v...)
 }
 
 func (c *WendyClient) Close() error {
