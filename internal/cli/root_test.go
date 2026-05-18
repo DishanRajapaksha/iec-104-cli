@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,6 +33,42 @@ func TestRunInvalidFormat(t *testing.T) {
 	}
 }
 
+func TestRunValidateConfig(t *testing.T) {
+	path := writeCLIConfig(t, `connection:
+  host: 127.0.0.1
+points:
+  - name: active_power
+    ioa: 1001
+    type: float
+`)
+
+	if got := Run([]string{"validate-config", "--config", path}); got != exitcode.Success {
+		t.Fatalf("Run(validate-config --config path) = %d, want %d", got, exitcode.Success)
+	}
+}
+
+func TestRunValidateConfigMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.yaml")
+	if got := Run([]string{"validate-config", "--config", path}); got != exitcode.ConfigError {
+		t.Fatalf("Run(validate-config --config missing) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
+func TestRunValidateConfigInvalidFile(t *testing.T) {
+	path := writeCLIConfig(t, `connection:
+  host: ""
+  port: 70000
+points:
+  - name: bad
+    ioa: 0
+    type: unknown
+`)
+
+	if got := Run([]string{"--config", path, "validate-config"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(--config path validate-config) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {
@@ -41,6 +79,12 @@ func TestParseGlobalOptionsDefaults(t *testing.T) {
 	}
 	if opts.Format != defaultFormat {
 		t.Fatalf("Format = %q, want %q", opts.Format, defaultFormat)
+	}
+	if opts.FormatSet {
+		t.Fatalf("FormatSet = true, want false")
+	}
+	if opts.TimeoutSet {
+		t.Fatalf("TimeoutSet = true, want false")
 	}
 	if len(rest) != 1 || rest[0] != "help" {
 		t.Fatalf("rest = %#v, want [help]", rest)
@@ -69,8 +113,14 @@ func TestParseGlobalOptionsValues(t *testing.T) {
 	if opts.Format != "jsonl" {
 		t.Fatalf("Format = %q, want jsonl", opts.Format)
 	}
+	if !opts.FormatSet {
+		t.Fatalf("FormatSet = false, want true")
+	}
 	if opts.Timeout != 15*time.Second {
 		t.Fatalf("Timeout = %s, want 15s", opts.Timeout)
+	}
+	if !opts.TimeoutSet {
+		t.Fatalf("TimeoutSet = false, want true")
 	}
 	if !opts.Verbose {
 		t.Fatalf("Verbose = false, want true")
@@ -80,6 +130,22 @@ func TestParseGlobalOptionsValues(t *testing.T) {
 	}
 	if len(rest) != 1 || rest[0] != "listen" {
 		t.Fatalf("rest = %#v, want [listen]", rest)
+	}
+}
+
+func TestParseGlobalOptionsAfterCommand(t *testing.T) {
+	opts, rest, err := parseGlobalOptions([]string{"validate-config", "--config", "site.yaml", "--format", "json"})
+	if err != nil {
+		t.Fatalf("parseGlobalOptions returned error: %v", err)
+	}
+	if opts.ConfigPath != "site.yaml" {
+		t.Fatalf("ConfigPath = %q, want site.yaml", opts.ConfigPath)
+	}
+	if opts.Format != "json" {
+		t.Fatalf("Format = %q, want json", opts.Format)
+	}
+	if len(rest) != 1 || rest[0] != "validate-config" {
+		t.Fatalf("rest = %#v, want [validate-config]", rest)
 	}
 }
 
@@ -95,4 +161,13 @@ func TestParseGlobalOptionsMissingValue(t *testing.T) {
 	if err == nil {
 		t.Fatal("parseGlobalOptions returned nil error for missing config value")
 	}
+}
+
+func writeCLIConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write CLI config: %v", err)
+	}
+	return path
 }
