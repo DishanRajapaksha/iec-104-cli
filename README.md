@@ -25,6 +25,12 @@ make deb
 sudo apt install ./dist/iec-104-cli_0.1.0_amd64.deb
 ```
 
+If multiple local users work in the same checkout, fix shared write permissions:
+
+```bash
+sudo scripts/fix-shared-permissions.sh
+```
+
 ## First Run
 
 Copy `config.example.yaml` to `config.yaml`, edit the connection and points, then validate it:
