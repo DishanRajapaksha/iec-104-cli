@@ -1,10 +1,13 @@
 package config
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -52,6 +55,7 @@ type Config struct {
 	Connection ConnectionConfig `yaml:"connection"`
 	IEC104     IEC104Config     `yaml:"iec104"`
 	Output     OutputConfig     `yaml:"output"`
+	PointFiles []string         `yaml:"point_files"`
 	Points     []PointConfig    `yaml:"points"`
 }
 
@@ -124,10 +128,111 @@ func Load(path string, overrides Overrides) (*Config, bool, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, true, fmt.Errorf("failed to parse config: %w", err)
 	}
+	if err := loadPointFiles(&cfg, filepath.Dir(path)); err != nil {
+		return nil, true, err
+	}
 
 	applyDefaults(&cfg)
 	applyOverrides(&cfg, overrides)
 	return &cfg, true, nil
+}
+
+func loadPointFiles(cfg *Config, baseDir string) error {
+	for _, pointFile := range cfg.PointFiles {
+		path := strings.TrimSpace(pointFile)
+		if path == "" {
+			continue
+		}
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(baseDir, path)
+		}
+		points, err := loadPointFile(path)
+		if err != nil {
+			return err
+		}
+		cfg.Points = append(cfg.Points, points...)
+	}
+	return nil
+}
+
+func loadPointFile(path string) ([]PointConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read point file %q: %w", path, err)
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".csv":
+		return parsePointCSV(path, data)
+	case ".yaml", ".yml":
+		return parsePointYAML(path, data)
+	default:
+		return nil, fmt.Errorf("unsupported point file %q: expected .csv, .yaml, or .yml", path)
+	}
+}
+
+func parsePointYAML(path string, data []byte) ([]PointConfig, error) {
+	var list []PointConfig
+	if err := yaml.Unmarshal(data, &list); err == nil && list != nil {
+		return list, nil
+	}
+	var doc struct {
+		Points []PointConfig `yaml:"points"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, fmt.Errorf("failed to parse point file %q: %w", path, err)
+	}
+	return doc.Points, nil
+}
+
+func parsePointCSV(path string, data []byte) ([]PointConfig, error) {
+	reader := csv.NewReader(strings.NewReader(string(data)))
+	reader.TrimLeadingSpace = true
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse point file %q: %w", path, err)
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	header := map[string]int{}
+	for i, name := range records[0] {
+		header[strings.ToLower(strings.TrimSpace(name))] = i
+	}
+	required := []string{"name", "ioa", "type"}
+	for _, name := range required {
+		if _, ok := header[name]; !ok {
+			return nil, fmt.Errorf("failed to parse point file %q: missing %q column", path, name)
+		}
+	}
+	points := make([]PointConfig, 0, len(records)-1)
+	for row, record := range records[1:] {
+		ioa, err := strconv.ParseUint(csvField(record, header["ioa"]), 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse point file %q row %d: invalid ioa: %w", path, row+2, err)
+		}
+		points = append(points, PointConfig{
+			Name: csvField(record, header["name"]),
+			IOA:  uint32(ioa),
+			Type: csvField(record, header["type"]),
+			Unit: csvOptionalField(record, header, "unit"),
+		})
+	}
+	return points, nil
+}
+
+func csvField(record []string, index int) string {
+	if index < 0 || index >= len(record) {
+		return ""
+	}
+	return strings.TrimSpace(record[index])
+}
+
+func csvOptionalField(record []string, header map[string]int, name string) string {
+	index, ok := header[name]
+	if !ok {
+		return ""
+	}
+	return csvField(record, index)
 }
 
 func LoadRequired(path string, overrides Overrides) (*Config, error) {

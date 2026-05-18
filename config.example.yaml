@@ -14,6 +14,11 @@ output:
   format: table
   timestamps: local
 
+# Optional external point files. Supported formats:
+# - CSV with columns: name,ioa,type,unit
+# - YAML as a list of points or an object with a points key
+point_files: []
+
 points:
   - name: active_power
     ioa: 1001

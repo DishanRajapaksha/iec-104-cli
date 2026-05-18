@@ -81,6 +81,52 @@ points:
 	}
 }
 
+func TestLoadPointFiles(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(filepath.Join(dir, "points.csv"), []byte(`name,ioa,type,unit
+active_power,1001,float,MW
+breaker_open,1002,single_point,
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "more-points.yaml"), []byte(`points:
+  - name: energy_total
+    ioa: 1003
+    type: integrated_total
+    unit: MWh
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(configPath, []byte(`connection:
+  host: 127.0.0.1
+point_files:
+  - points.csv
+  - more-points.yaml
+points:
+  - name: voltage
+    ioa: 1004
+    type: scaled
+    unit: kV
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, found, err := Load(configPath, Overrides{})
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if len(cfg.Points) != 4 {
+		t.Fatalf("point count = %d, want 4: %#v", len(cfg.Points), cfg.Points)
+	}
+	if cfg.Points[0].Name != "voltage" || cfg.Points[1].Name != "active_power" || cfg.Points[3].Name != "energy_total" {
+		t.Fatalf("points = %#v", cfg.Points)
+	}
+}
+
 func TestLoadRequiredMissing(t *testing.T) {
 	dir := t.TempDir()
 	_, err := LoadRequired(filepath.Join(dir, "missing.yaml"), Overrides{})
