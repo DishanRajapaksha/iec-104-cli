@@ -84,11 +84,86 @@ func Run(args []string) int {
 		return runCommand(opts, rest[1:])
 	case "setpoint":
 		return runSetpoint(opts, rest[1:])
+	case "clock-sync":
+		return runClockSync(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runClockSync(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("clock-sync", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
+	timeOverride := ""
+	safety := controlSafety{}
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "clock-sync timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address")
+	fs.StringVar(&timeOverride, "time", "", "RFC3339 timestamp to send")
+	fs.BoolVar(&safety.DryRun, "dry-run", false, "print clock-sync without sending")
+	fs.BoolVar(&safety.Yes, "yes", false, "send the clock-sync command")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if err := safety.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	syncTime := time.Now()
+	if timeOverride != "" {
+		parsed, err := time.Parse(time.RFC3339, timeOverride)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid --time %q: %v\n", timeOverride, err)
+			return exitcode.ConfigError
+		}
+		syncTime = parsed
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
+
+	fmt.Fprintln(os.Stdout, "Clock sync")
+	fmt.Fprintf(os.Stdout, "Common address: %d\n", cfg.IEC104.CommonAddress)
+	fmt.Fprintf(os.Stdout, "Time: %s\n", syncTime.Format(time.RFC3339))
+	if !safety.AllowsExecution() {
+		fmt.Fprintln(os.Stdout, "Mode: dry-run")
+		fmt.Fprintln(os.Stdout, "Result: not sent")
+		return exitcode.Success
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	if err := client.SyncClock(ctx, cfg.IEC104.CommonAddress, syncTime); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	fmt.Fprintln(os.Stdout, "Mode: execute")
+	fmt.Fprintln(os.Stdout, "Result: sent")
+	return exitcode.Success
 }
 
 func runSetpoint(opts globalOptions, args []string) int {
@@ -986,9 +1061,9 @@ Available commands:
   read             Send IEC 104 read for a specific IOA
   command          Run control commands with dry-run safety
   setpoint         Run setpoint commands with dry-run safety
+  clock-sync       Run clock synchronization with dry-run safety
 
 Planned commands:
-  clock-sync
   completions
 
 `, appName, appName)

@@ -602,7 +602,7 @@ iec-104-cli setpoint float --ioa 2002 --value 12.5 --dry-run
 
 ## Task 18: Add `clock-sync`
 
-Status: [ ]
+Status: [x]
 
 Implement clock synchronisation command.
 

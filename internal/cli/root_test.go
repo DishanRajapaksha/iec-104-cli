@@ -144,6 +144,12 @@ func TestParseSetpointValue(t *testing.T) {
 	}
 }
 
+func TestRunClockSyncDryRunWithTime(t *testing.T) {
+	if got := Run([]string{"clock-sync", "--time", "2026-05-18T12:00:00Z", "--dry-run"}); got != exitcode.Success {
+		t.Fatalf("Run(clock-sync dry run) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

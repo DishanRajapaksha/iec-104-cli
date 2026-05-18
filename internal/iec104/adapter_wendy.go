@@ -149,6 +149,15 @@ func (c *WendyClient) SendSetpoint(ctx context.Context, commonAddress uint16, io
 	return mapWendyError(c.client.SendCmd(commonAddress, typeID, asdu.InfoObjAddr(ioa), value))
 }
 
+func (c *WendyClient) SyncClock(ctx context.Context, commonAddress uint16, t time.Time) error {
+	if c.client == nil || !c.client.IsConnected() {
+		if err := c.Connect(ctx); err != nil {
+			return err
+		}
+	}
+	return mapWendyError(c.client.SendClockSynchronizationCmd(commonAddress, t))
+}
+
 type wendyCallback struct {
 	events chan<- PointValue
 }

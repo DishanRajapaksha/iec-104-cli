@@ -15,6 +15,7 @@ type Client interface {
 	SendSingleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value bool) error
 	SendDoubleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value uint8) error
 	SendSetpoint(ctx context.Context, commonAddress uint16, ioa uint32, kind string, value any) error
+	SyncClock(ctx context.Context, commonAddress uint16, t time.Time) error
 }
 
 type ClientConfig struct {
