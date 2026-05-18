@@ -11,6 +11,13 @@ make build
 ./bin/iec-104-cli help
 ```
 
+Build a container image:
+
+```bash
+make docker-build
+docker run --rm iec-104-cli:latest help
+```
+
 ## First Run
 
 Copy `config.example.yaml` to `config.yaml`, edit the connection and points, then validate it:
