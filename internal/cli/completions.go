@@ -25,7 +25,7 @@ _iec_104_cli()
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="help version validate-config init-config generate-configs test-connection listen interrogate watch read command setpoint clock-sync completions"
+    commands="help version validate-config init-config generate-configs status test-connection listen interrogate watch read command setpoint clock-sync completions"
     case "$prev" in
         iec-104-cli)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
@@ -57,6 +57,7 @@ _iec_104_cli() {
     'validate-config:validate local config'
     'init-config:generate example config files'
     'generate-configs:generate example config files'
+    'status:run connection diagnostics'
     'test-connection:run connection diagnostics'
     'listen:print incoming values'
     'interrogate:send general interrogation'

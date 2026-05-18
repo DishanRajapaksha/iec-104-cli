@@ -147,6 +147,8 @@ func Run(args []string) int {
 		return runGenerateConfigs(opts, rest[1:])
 	case "test-connection":
 		return runTestConnection(opts, rest[1:])
+	case "status":
+		return runTestConnection(opts, rest[1:])
 	case "listen":
 		return runListen(opts, rest[1:])
 	case "interrogate":
@@ -1293,6 +1295,7 @@ Available commands:
   validate-config  Validate local config without server connection
   init-config      Generate example config files
   generate-configs Generate example config files
+  status           Run TCP and IEC 104 STARTDT diagnostics
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values
   interrogate      Send general interrogation and print matching values

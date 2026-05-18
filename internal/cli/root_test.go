@@ -47,6 +47,12 @@ func TestRunTestConnectionRequiresHost(t *testing.T) {
 	}
 }
 
+func TestRunStatusAliasRequiresHost(t *testing.T) {
+	if got := Run([]string{"status", "--config", "missing-test-config.yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(status missing host) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestRunListenRejectsUnknownFormat(t *testing.T) {
 	if got := Run([]string{"listen", "--format", "yaml"}); got != exitcode.ConfigError {
 		t.Fatalf("Run(listen invalid format) = %d, want %d", got, exitcode.ConfigError)
