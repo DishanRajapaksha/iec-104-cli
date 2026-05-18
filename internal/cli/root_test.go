@@ -49,6 +49,12 @@ func TestRunListenRejectsUnknownFormat(t *testing.T) {
 	}
 }
 
+func TestRunInterrogateRejectsUnknownPoint(t *testing.T) {
+	if got := Run([]string{"interrogate", "--config", "config.example.yaml", "--point", "missing"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(interrogate unknown point) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

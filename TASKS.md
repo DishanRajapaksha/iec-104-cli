@@ -361,7 +361,7 @@ iec-104-cli listen --duration 10s --format jsonl
 
 ## Task 10: Add `interrogate`
 
-Status: [ ]
+Status: [x]
 
 Implement general interrogation.
 

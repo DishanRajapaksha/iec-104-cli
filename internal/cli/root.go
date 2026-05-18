@@ -73,11 +73,88 @@ func Run(args []string) int {
 		return runTestConnection(opts, rest[1:])
 	case "listen":
 		return runListen(opts, rest[1:])
+	case "interrogate":
+		return runInterrogate(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runInterrogate(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("interrogate", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
+	ioa := uint(0)
+	pointName := ""
+	format := opts.Format
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "interrogation timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address to interrogate")
+	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
+	fs.StringVar(&pointName, "point", "", "filter by configured point name")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if _, ok := allowedFormats[format]; !ok {
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	filter, err := buildPointFilter(*cfg, 0, uint32(ioa), pointName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	values, err := client.Interrogate(ctx, cfg.IEC104.CommonAddress)
+	filtered := make([]iec104.PointValue, 0, len(values))
+	for _, value := range values {
+		if enriched, ok := filter(value); ok {
+			filtered = append(filtered, enriched)
+		}
+	}
+	if len(filtered) == 0 && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+		fmt.Fprintln(os.Stderr, "interrogation timed out before receiving matching values")
+		return exitcode.InterrogationTimeout
+	}
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	if err := writePointValues(os.Stdout, format, filtered); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.OutputError
+	}
+	return exitcode.Success
 }
 
 func runListen(opts globalOptions, args []string) int {
@@ -431,9 +508,9 @@ Available commands:
   validate-config  Validate local config without server connection
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values
+  interrogate      Send general interrogation and print matching values
 
 Planned commands:
-  interrogate
   watch
   read
   command
