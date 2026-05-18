@@ -15,7 +15,7 @@ Each task should be small enough to complete in a focused pull request. Prefer o
 
 ## Task 1: Scaffold Go module and CLI entrypoint
 
-Status: [ ]
+Status: [x]
 
 Create the basic Go project structure.
 
