@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -13,6 +14,7 @@ const (
 	DefaultConfigPath = "config.yaml"
 	DefaultPort       = 2404
 	DefaultFormat     = "table"
+	MaxIOA            = 0xFFFFFF
 )
 
 // Duration wraps time.Duration so YAML config can use values such as "10s" or "1m".
@@ -46,11 +48,11 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Config struct {
-	Connection ConnectionConfig    `yaml:"connection"`
-	IEC104     IEC104Config        `yaml:"iec104"`
-	Output     OutputConfig        `yaml:"output"`
-	Points     []PointConfig       `yaml:"points"`
-	Profiles   map[string]Profile  `yaml:"profiles,omitempty"`
+	Connection ConnectionConfig   `yaml:"connection"`
+	IEC104     IEC104Config       `yaml:"iec104"`
+	Output     OutputConfig       `yaml:"output"`
+	Points     []PointConfig      `yaml:"points"`
+	Profiles   map[string]Profile `yaml:"profiles,omitempty"`
 }
 
 type Profile struct {
@@ -93,6 +95,24 @@ type Overrides struct {
 	Format     string
 	Profile    string
 	ConfigPath string
+}
+
+type ValidationError struct {
+	Problems []string
+}
+
+func (e ValidationError) Error() string {
+	if len(e.Problems) == 0 {
+		return "invalid config"
+	}
+
+	var b strings.Builder
+	b.WriteString("invalid config:")
+	for _, problem := range e.Problems {
+		b.WriteString("\n - ")
+		b.WriteString(problem)
+	}
+	return b.String()
 }
 
 func Defaults() Config {
@@ -206,6 +226,79 @@ func Load(path string, overrides Overrides) (Config, bool, error) {
 
 	cfg = ApplyOverrides(cfg, overrides)
 	return cfg, loaded, nil
+}
+
+func Validate(cfg Config) error {
+	var problems []string
+
+	if strings.TrimSpace(cfg.Connection.Host) == "" {
+		problems = append(problems, "connection.host is required")
+	}
+	if cfg.Connection.Port < 1 || cfg.Connection.Port > 65535 {
+		problems = append(problems, "connection.port must be between 1 and 65535")
+	}
+	if cfg.Connection.Timeout.Duration() <= 0 {
+		problems = append(problems, "connection.timeout must be positive")
+	}
+	if cfg.Connection.Reconnect && cfg.Connection.ReconnectInterval.Duration() <= 0 {
+		problems = append(problems, "connection.reconnect_interval must be positive when reconnect is enabled")
+	}
+	if cfg.IEC104.CommonAddress == 0 {
+		problems = append(problems, "iec104.common_address must be greater than 0")
+	}
+	if cfg.IEC104.InterrogationQualifier == 0 {
+		problems = append(problems, "iec104.interrogation_qualifier must be greater than 0")
+	}
+	if !validFormat(cfg.Output.Format) {
+		problems = append(problems, "output.format must be one of table, text, json, jsonl")
+	}
+	if cfg.Output.Timestamps != "" && cfg.Output.Timestamps != "local" && cfg.Output.Timestamps != "utc" {
+		problems = append(problems, "output.timestamps must be local or utc")
+	}
+
+	seenNames := map[string]struct{}{}
+	for i, point := range cfg.Points {
+		prefix := fmt.Sprintf("points[%d]", i)
+		name := strings.TrimSpace(point.Name)
+		if name == "" {
+			problems = append(problems, prefix+".name is required")
+		} else if _, exists := seenNames[name]; exists {
+			problems = append(problems, fmt.Sprintf("point name %q is duplicated", name))
+		} else {
+			seenNames[name] = struct{}{}
+		}
+
+		if point.IOA == 0 || point.IOA > MaxIOA {
+			problems = append(problems, prefix+".ioa must be between 1 and 16777215")
+		}
+		if !validPointType(point.Type) {
+			problems = append(problems, prefix+".type must be one of single_point, double_point, normalized, scaled, float, integrated_total")
+		}
+	}
+
+	if len(problems) > 0 {
+		return ValidationError{Problems: problems}
+	}
+
+	return nil
+}
+
+func validFormat(format string) bool {
+	switch format {
+	case "table", "text", "json", "jsonl":
+		return true
+	default:
+		return false
+	}
+}
+
+func validPointType(pointType string) bool {
+	switch pointType {
+	case "single_point", "double_point", "normalized", "scaled", "float", "integrated_total":
+		return true
+	default:
+		return false
+	}
 }
 
 func applyDefaults(cfg *Config) {
