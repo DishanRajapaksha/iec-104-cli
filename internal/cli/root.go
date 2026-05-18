@@ -79,11 +79,65 @@ func Run(args []string) int {
 		return runWatch(opts, rest[1:])
 	case "read":
 		return runRead(opts, rest[1:])
+	case "command":
+		return runCommand(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runCommand(opts globalOptions, args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "command type is required")
+		return exitcode.ConfigError
+	}
+	switch args[0] {
+	case "single":
+		return runCommandSingle(opts, args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command type %q\n", args[0])
+		return exitcode.ConfigError
+	}
+}
+
+func runCommandSingle(_ globalOptions, args []string) int {
+	fs := flag.NewFlagSet("command single", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	ioa := uint(0)
+	value := ""
+	safety := controlSafety{}
+	fs.UintVar(&ioa, "ioa", 0, "information object address")
+	fs.StringVar(&value, "value", "", "single command value")
+	fs.BoolVar(&safety.DryRun, "dry-run", false, "print command without sending")
+	fs.BoolVar(&safety.Yes, "yes", false, "send the command")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	if err := safety.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	if ioa == 0 {
+		fmt.Fprintln(os.Stderr, "--ioa is required")
+		return exitcode.ConfigError
+	}
+	if value == "" {
+		fmt.Fprintln(os.Stderr, "--value is required")
+		return exitcode.ConfigError
+	}
+
+	fmt.Fprintln(os.Stdout, "Control command: single")
+	fmt.Fprintf(os.Stdout, "IOA: %d\n", ioa)
+	fmt.Fprintf(os.Stdout, "Value: %s\n", value)
+	if !safety.AllowsExecution() {
+		fmt.Fprintln(os.Stdout, "Mode: dry-run")
+		fmt.Fprintln(os.Stdout, "Result: not sent")
+		return exitcode.Success
+	}
+	fmt.Fprintln(os.Stderr, "real single command execution is not implemented yet")
+	return exitcode.UnsupportedASDU
 }
 
 func runRead(opts globalOptions, args []string) int {
@@ -651,9 +705,9 @@ Available commands:
   interrogate      Send general interrogation and print matching values
   watch            Print latest cached values on an interval
   read             Send IEC 104 read for a specific IOA
+  command          Run control commands with dry-run safety
 
 Planned commands:
-  command
   setpoint
   clock-sync
   completions

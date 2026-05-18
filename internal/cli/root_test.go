@@ -67,6 +67,12 @@ func TestRunReadRequiresIOA(t *testing.T) {
 	}
 }
 
+func TestRunCommandSingleDefaultsToDryRun(t *testing.T) {
+	if got := Run([]string{"command", "single", "--ioa", "1000", "--value", "on"}); got != exitcode.Success {
+		t.Fatalf("Run(command single dry run) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

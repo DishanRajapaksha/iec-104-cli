@@ -487,7 +487,7 @@ iec-104-cli read --ioa 1001 --format json
 
 ## Task 14: Add dry-run safety model for control commands
 
-Status: [ ]
+Status: [x]
 
 Create shared safety handling for control operations.
 
