@@ -204,7 +204,7 @@ Acceptance:
 
 ## Task 6: Add IEC 104 internal domain types
 
-Status: [ ]
+Status: [x]
 
 Create protocol-independent local types.
 
