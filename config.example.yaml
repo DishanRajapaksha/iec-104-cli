@@ -1,0 +1,21 @@
+connection:
+  host: 127.0.0.1
+  port: 2404
+  timeout: 10s
+  reconnect: true
+  reconnect_interval: 5s
+
+iec104:
+  common_address: 1
+  originator_address: 0
+  interrogation_qualifier: 20
+
+output:
+  format: table
+  timestamps: local
+
+points:
+  - name: active_power
+    ioa: 1001
+    type: float
+    unit: MW

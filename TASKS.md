@@ -82,7 +82,7 @@ iec-104-cli --format nonsense validate-config
 
 ## Task 3: Add config model and YAML loader
 
-Status: [ ]
+Status: [x]
 
 Implement config parsing and merging.
 
