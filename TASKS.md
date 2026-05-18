@@ -462,7 +462,7 @@ iec-104-cli watch --point active_power --interval 1s --format jsonl
 
 ## Task 13: Add `read`
 
-Status: [ ]
+Status: [x]
 
 Implement IEC 104 read command for a specific IOA.
 

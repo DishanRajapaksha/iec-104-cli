@@ -90,6 +90,27 @@ func (c *WendyClient) Listen(ctx context.Context, handler func(PointValue)) erro
 	}
 }
 
+func (c *WendyClient) Read(ctx context.Context, commonAddress uint16, ioa uint32) (PointValue, error) {
+	if c.client == nil || !c.client.IsConnected() {
+		if err := c.Connect(ctx); err != nil {
+			return PointValue{}, err
+		}
+	}
+	if err := c.client.SendReadCmd(commonAddress, uint(ioa)); err != nil {
+		return PointValue{}, mapWendyError(err)
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return PointValue{}, ctx.Err()
+		case value := <-c.events:
+			if value.CommonAddress == commonAddress && value.IOA == ioa {
+				return value, nil
+			}
+		}
+	}
+}
+
 type wendyCallback struct {
 	events chan<- PointValue
 }

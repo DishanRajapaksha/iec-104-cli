@@ -61,6 +61,12 @@ func TestRunWatchRejectsInvalidInterval(t *testing.T) {
 	}
 }
 
+func TestRunReadRequiresIOA(t *testing.T) {
+	if got := Run([]string{"read", "--config", "config.example.yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(read missing ioa) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

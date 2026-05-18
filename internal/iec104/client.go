@@ -11,6 +11,7 @@ type Client interface {
 	TestConnection(ctx context.Context) error
 	Interrogate(ctx context.Context, commonAddress uint16) ([]PointValue, error)
 	Listen(ctx context.Context, handler func(PointValue)) error
+	Read(ctx context.Context, commonAddress uint16, ioa uint32) (PointValue, error)
 }
 
 type ClientConfig struct {

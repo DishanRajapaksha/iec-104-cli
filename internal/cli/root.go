@@ -77,11 +77,89 @@ func Run(args []string) int {
 		return runInterrogate(opts, rest[1:])
 	case "watch":
 		return runWatch(opts, rest[1:])
+	case "read":
+		return runRead(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
 	}
+}
+
+func runRead(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("read", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
+	ioa := uint(0)
+	format := opts.Format
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "read timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address")
+	fs.UintVar(&ioa, "ioa", 0, "information object address to read")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if ioa == 0 {
+		fmt.Fprintln(os.Stderr, "--ioa is required")
+		return exitcode.ConfigError
+	}
+	if _, ok := allowedFormats[format]; !ok {
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	filter, err := buildPointFilter(*cfg, 0, uint32(ioa), "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	value, err := client.Read(ctx, cfg.IEC104.CommonAddress, uint32(ioa))
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		fmt.Fprintf(os.Stderr, "read timed out waiting for IOA %d; some IEC 104 devices do not support read and expect interrogation or spontaneous updates instead\n", ioa)
+		return exitcode.InterrogationTimeout
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	enriched, ok := filter(value)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "read response did not match IOA %d\n", ioa)
+		return exitcode.GeneralError
+	}
+	if err := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.OutputError
+	}
+	return exitcode.Success
 }
 
 func runWatch(opts globalOptions, args []string) int {
@@ -572,9 +650,9 @@ Available commands:
   listen           Print incoming point values
   interrogate      Send general interrogation and print matching values
   watch            Print latest cached values on an interval
+  read             Send IEC 104 read for a specific IOA
 
 Planned commands:
-  read
   command
   setpoint
   clock-sync
