@@ -704,7 +704,7 @@ Expected result: exit code 2.
 
 ## Task 22: Add README documentation
 
-Status: [ ]
+Status: [x]
 
 Expand README into user-facing documentation.
 
