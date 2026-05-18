@@ -786,11 +786,25 @@ Acceptance:
 
 ## Task 25: Field hardening backlog
 
-Status: [ ]
+Status: [x]
 
 Do after the basic CLI works.
 
-Possible additions:
+Future tasks:
+
+- Task 26: Add reconnect loop for `listen`
+- Task 27: Add reconnect loop for `watch`
+- Task 28: Add protocol frame debug dump behind an explicit flag
+- Task 29: Research TLS or IEC 62351 support
+- Task 30: Add CSV output
+- Task 31: Add point file import
+- Task 32: Add generated example configs
+- Task 33: Add Docker image
+- Task 34: Add Debian package
+- Task 35: Add Homebrew formula
+- Task 36: Add GitHub release checksums
+
+Original candidates:
 
 - reconnect loop for `listen`
 - reconnect loop for `watch`
