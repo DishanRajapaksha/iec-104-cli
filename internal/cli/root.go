@@ -660,11 +660,10 @@ func runWatch(opts globalOptions, args []string) int {
 	defer cancel()
 	cache := iec104.NewLatestCache()
 	errCh := make(chan error, 1)
-	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
 	logVerbose(opts, "starting watch on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "watch interval=%s stale_after=%s ioa=%d point=%q format=%s", interval, staleAfter, ioa, pointName, format)
 	go func() {
-		errCh <- client.Listen(ctx, func(value iec104.PointValue) {
+		errCh <- runListenWithReconnect(ctx, *cfg, opts, "watch", func(value iec104.PointValue) {
 			cache.Update(value)
 		})
 	}()
@@ -842,7 +841,7 @@ func runListen(opts globalOptions, args []string) int {
 
 	logVerbose(opts, "listening on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "listen duration=%s common_address=%d ioa=%d point=%q format=%s", duration, commonAddress, ioa, pointName, format)
-	err = listenWithReconnect(ctx, *cfg, opts, func(value iec104.PointValue) {
+	err = runListenWithReconnect(ctx, *cfg, opts, "listen", func(value iec104.PointValue) {
 		if enriched, ok := filter(value); ok {
 			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
 				fmt.Fprintln(os.Stderr, writeErr)
@@ -859,7 +858,7 @@ func runListen(opts globalOptions, args []string) int {
 	return exitcode.Success
 }
 
-func listenWithReconnect(ctx context.Context, cfg config.Config, opts globalOptions, handler func(iec104.PointValue)) error {
+func runListenWithReconnect(ctx context.Context, cfg config.Config, opts globalOptions, label string, handler func(iec104.PointValue)) error {
 	for {
 		client := iec104.NewWendyClient(clientConfigFromConfig(cfg, opts.Debug))
 		err := client.Listen(ctx, handler)
@@ -871,7 +870,7 @@ func listenWithReconnect(ctx context.Context, cfg config.Config, opts globalOpti
 			return err
 		}
 		interval := cfg.Connection.ReconnectInterval.Duration()
-		logVerbose(opts, "listen disconnected: %v; reconnecting in %s", err, interval)
+		logVerbose(opts, "%s disconnected: %v; reconnecting in %s", label, err, interval)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
