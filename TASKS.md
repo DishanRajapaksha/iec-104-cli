@@ -511,7 +511,7 @@ The first two must not send anything.
 
 ## Task 15: Add `command single`
 
-Status: [ ]
+Status: [x]
 
 Implement single command.
 

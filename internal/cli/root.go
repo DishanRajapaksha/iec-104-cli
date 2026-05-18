@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,19 +103,32 @@ func runCommand(opts globalOptions, args []string) int {
 	}
 }
 
-func runCommandSingle(_ globalOptions, args []string) int {
+func runCommandSingle(opts globalOptions, args []string) int {
 	fs := flag.NewFlagSet("command single", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
 	ioa := uint(0)
-	value := ""
+	rawValue := ""
 	safety := controlSafety{}
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "command timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address")
 	fs.UintVar(&ioa, "ioa", 0, "information object address")
-	fs.StringVar(&value, "value", "", "single command value")
+	fs.StringVar(&rawValue, "value", "", "single command value")
 	fs.BoolVar(&safety.DryRun, "dry-run", false, "print command without sending")
 	fs.BoolVar(&safety.Yes, "yes", false, "send the command")
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
+	_ = profile
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -123,21 +137,66 @@ func runCommandSingle(_ globalOptions, args []string) int {
 		fmt.Fprintln(os.Stderr, "--ioa is required")
 		return exitcode.ConfigError
 	}
-	if value == "" {
+	if rawValue == "" {
 		fmt.Fprintln(os.Stderr, "--value is required")
 		return exitcode.ConfigError
 	}
+	value, err := parseSingleCommandValue(rawValue)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
 
 	fmt.Fprintln(os.Stdout, "Control command: single")
+	fmt.Fprintf(os.Stdout, "Common address: %d\n", cfg.IEC104.CommonAddress)
 	fmt.Fprintf(os.Stdout, "IOA: %d\n", ioa)
-	fmt.Fprintf(os.Stdout, "Value: %s\n", value)
+	fmt.Fprintf(os.Stdout, "Type: single\n")
+	fmt.Fprintf(os.Stdout, "Value: %t\n", value)
+	fmt.Fprintf(os.Stdout, "Qualifier: no_additional_definition\n")
 	if !safety.AllowsExecution() {
 		fmt.Fprintln(os.Stdout, "Mode: dry-run")
 		fmt.Fprintln(os.Stdout, "Result: not sent")
 		return exitcode.Success
 	}
-	fmt.Fprintln(os.Stderr, "real single command execution is not implemented yet")
-	return exitcode.UnsupportedASDU
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	if err := client.SendSingleCommand(ctx, cfg.IEC104.CommonAddress, uint32(ioa), value); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	fmt.Fprintln(os.Stdout, "Mode: execute")
+	fmt.Fprintln(os.Stdout, "Result: sent")
+	return exitcode.Success
+}
+
+func parseSingleCommandValue(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "on", "true", "1":
+		return true, nil
+	case "off", "false", "0":
+		return false, nil
+	default:
+		if parsed, err := strconv.ParseBool(value); err == nil {
+			return parsed, nil
+		}
+		return false, fmt.Errorf("invalid single command value %q; expected on, off, true, false, 1, or 0", value)
+	}
 }
 
 func runRead(opts globalOptions, args []string) int {

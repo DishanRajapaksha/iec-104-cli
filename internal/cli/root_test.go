@@ -73,6 +73,24 @@ func TestRunCommandSingleDefaultsToDryRun(t *testing.T) {
 	}
 }
 
+func TestParseSingleCommandValue(t *testing.T) {
+	for _, value := range []string{"on", "true", "1"} {
+		got, err := parseSingleCommandValue(value)
+		if err != nil || !got {
+			t.Fatalf("parseSingleCommandValue(%q) = %t, %v; want true, nil", value, got, err)
+		}
+	}
+	for _, value := range []string{"off", "false", "0"} {
+		got, err := parseSingleCommandValue(value)
+		if err != nil || got {
+			t.Fatalf("parseSingleCommandValue(%q) = %t, %v; want false, nil", value, got, err)
+		}
+	}
+	if _, err := parseSingleCommandValue("open"); err == nil {
+		t.Fatal("expected invalid value error")
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

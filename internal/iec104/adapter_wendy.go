@@ -111,6 +111,15 @@ func (c *WendyClient) Read(ctx context.Context, commonAddress uint16, ioa uint32
 	}
 }
 
+func (c *WendyClient) SendSingleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value bool) error {
+	if c.client == nil || !c.client.IsConnected() {
+		if err := c.Connect(ctx); err != nil {
+			return err
+		}
+	}
+	return mapWendyError(c.client.SendCmd(commonAddress, asdu.C_SC_NA_1, asdu.InfoObjAddr(ioa), value))
+}
+
 type wendyCallback struct {
 	events chan<- PointValue
 }
