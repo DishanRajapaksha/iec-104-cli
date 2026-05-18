@@ -1,0 +1,5 @@
+points:
+  - name: energy_total
+    ioa: 1004
+    type: integrated_total
+    unit: MWh

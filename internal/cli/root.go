@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,66 @@ const (
 	defaultConfigPath = "config.yaml"
 	defaultFormat     = "table"
 )
+
+const generatedBasicConfig = `connection:
+  host: 127.0.0.1
+  port: 2404
+  timeout: 10s
+  reconnect: true
+  reconnect_interval: 5s
+
+iec104:
+  common_address: 1
+  originator_address: 0
+  interrogation_qualifier: 20
+
+output:
+  format: table
+  timestamps: local
+
+points:
+  - name: active_power
+    ioa: 1001
+    type: float
+    unit: MW
+  - name: breaker_open
+    ioa: 1002
+    type: single_point
+`
+
+const generatedCSVPointConfig = `connection:
+  host: 127.0.0.1
+  port: 2404
+  timeout: 10s
+  reconnect: true
+  reconnect_interval: 5s
+
+iec104:
+  common_address: 1
+  originator_address: 0
+  interrogation_qualifier: 20
+
+output:
+  format: csv
+  timestamps: local
+
+point_files:
+  - points.csv
+  - multi-point.yaml
+`
+
+const generatedPointsCSV = `name,ioa,type,unit
+active_power,1001,float,MW
+reactive_power,1002,float,Mvar
+breaker_open,1003,single_point,
+`
+
+const generatedPointYAML = `points:
+  - name: energy_total
+    ioa: 1004
+    type: integrated_total
+    unit: MWh
+`
 
 var allowedFormats = map[string]struct{}{
 	"table": {},
@@ -72,6 +133,8 @@ func Run(args []string) int {
 		return exitcode.Success
 	case "validate-config":
 		return runValidateConfig(opts, rest[1:])
+	case "generate-configs":
+		return runGenerateConfigs(opts, rest[1:])
 	case "test-connection":
 		return runTestConnection(opts, rest[1:])
 	case "listen":
@@ -1023,6 +1086,38 @@ func mapRunError(err error) int {
 	}
 }
 
+func runGenerateConfigs(_ globalOptions, args []string) int {
+	fs := flag.NewFlagSet("generate-configs", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	dir := "examples"
+	fs.StringVar(&dir, "dir", dir, "directory for generated example configs")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	if strings.TrimSpace(dir) == "" {
+		fmt.Fprintln(os.Stderr, "--dir is required")
+		return exitcode.ConfigError
+	}
+	files := map[string]string{
+		"basic.yaml":       generatedBasicConfig,
+		"csv-points.yaml":  generatedCSVPointConfig,
+		"points.csv":       generatedPointsCSV,
+		"multi-point.yaml": generatedPointYAML,
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.OutputError
+	}
+	for name, contents := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.OutputError
+		}
+	}
+	fmt.Fprintf(os.Stdout, "generated %d example config files in %s\n", len(files), dir)
+	return exitcode.Success
+}
+
 func runValidateConfig(opts globalOptions, args []string) int {
 	fs := flag.NewFlagSet("validate-config", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -1159,6 +1254,7 @@ Available commands:
   help             Show this help message
   version          Show version information
   validate-config  Validate local config without server connection
+  generate-configs Generate example config files
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values
   interrogate      Send general interrogation and print matching values

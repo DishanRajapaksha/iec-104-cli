@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -199,6 +201,18 @@ func TestParseGlobalOptionsDefaults(t *testing.T) {
 	}
 	if len(rest) != 1 || rest[0] != "help" {
 		t.Fatalf("rest = %#v, want [help]", rest)
+	}
+}
+
+func TestRunGenerateConfigs(t *testing.T) {
+	dir := t.TempDir()
+	if got := Run([]string{"generate-configs", "--dir", dir}); got != exitcode.Success {
+		t.Fatalf("Run(generate-configs) = %d, want %d", got, exitcode.Success)
+	}
+	for _, name := range []string{"basic.yaml", "csv-points.yaml", "points.csv", "multi-point.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("generated file %q missing: %v", name, err)
+		}
 	}
 }
 

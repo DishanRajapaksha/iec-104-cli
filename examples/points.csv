@@ -1,0 +1,4 @@
+name,ioa,type,unit
+active_power,1001,float,MW
+reactive_power,1002,float,Mvar
+breaker_open,1003,single_point,
