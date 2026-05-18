@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -168,6 +169,53 @@ func TestDurationUnmarshalRejectsInvalidValue(t *testing.T) {
 	_, err := LoadFile(path)
 	if err == nil {
 		t.Fatal("LoadFile returned nil error for invalid duration")
+	}
+}
+
+func TestValidateAcceptsValidConfig(t *testing.T) {
+	cfg := Defaults()
+	cfg.Connection.Host = "127.0.0.1"
+	cfg.Points = []PointConfig{{Name: "active_power", IOA: 1001, Type: "float"}}
+
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidConfig(t *testing.T) {
+	cfg := Defaults()
+	cfg.Connection.Host = ""
+	cfg.Connection.Port = 70000
+	cfg.Connection.Timeout = NewDuration(-time.Second)
+	cfg.Output.Format = "xml"
+	cfg.Output.Timestamps = "mars"
+	cfg.Points = []PointConfig{
+		{Name: "dup", IOA: 0, Type: "float"},
+		{Name: "dup", IOA: MaxIOA + 1, Type: "bad"},
+		{Name: "", IOA: 1, Type: "single_point"},
+	}
+
+	err := Validate(cfg)
+	if err == nil {
+		t.Fatal("Validate returned nil error for invalid config")
+	}
+
+	message := err.Error()
+	wantFragments := []string{
+		"connection.host is required",
+		"connection.port must be between 1 and 65535",
+		"connection.timeout must be positive",
+		"output.format must be one of table, text, json, jsonl",
+		"output.timestamps must be local or utc",
+		"point name \"dup\" is duplicated",
+		"points[0].ioa must be between 1 and 16777215",
+		"points[1].type must be one of",
+		"points[2].name is required",
+	}
+	for _, fragment := range wantFragments {
+		if !strings.Contains(message, fragment) {
+			t.Fatalf("Validate error %q does not contain %q", message, fragment)
+		}
 	}
 }
 
