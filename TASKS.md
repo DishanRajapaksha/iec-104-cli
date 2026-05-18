@@ -49,7 +49,7 @@ make build
 
 ## Task 2: Add root command, shared flags, and help text
 
-Status: [ ]
+Status: [x]
 
 Implement the CLI root command and global flags.
 
@@ -846,5 +846,3 @@ Before starting any task:
 5. Run `go test ./...` before opening a PR.
 6. Do not add control-command behaviour without dry-run safety.
 7. Do not import third-party IEC 104 packages directly in the CLI layer.
-
-Small PRs beat heroic swamp expeditions.
