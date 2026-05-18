@@ -87,8 +87,8 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 		}
 
 		if !strings.HasPrefix(arg, "-") {
-			rest = append(rest, args[i:]...)
-			break
+			rest = append(rest, arg)
+			continue
 		}
 
 		name, value, hasInlineValue := strings.Cut(arg, "=")
@@ -140,8 +140,6 @@ func parseGlobalOptions(args []string) (globalOptions, []string, error) {
 			opts.Debug = true
 		case "--help", "-h", "--version", "-v":
 			rest = append(rest, arg)
-			rest = append(rest, args[i+1:]...)
-			return opts, rest, nil
 		default:
 			return opts, nil, fmt.Errorf("unknown global flag %q", name)
 		}
