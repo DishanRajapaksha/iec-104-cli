@@ -253,7 +253,7 @@ go test ./...
 
 ## Task 7: Add `wendy512/iec104` adapter spike
 
-Status: [ ]
+Status: [x]
 
 Add the dependency and wrap it behind a local interface.
 
