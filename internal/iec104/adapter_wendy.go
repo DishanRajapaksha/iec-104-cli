@@ -129,6 +129,26 @@ func (c *WendyClient) SendDoubleCommand(ctx context.Context, commonAddress uint1
 	return mapWendyError(c.client.SendCmd(commonAddress, asdu.C_DC_NA_1, asdu.InfoObjAddr(ioa), value))
 }
 
+func (c *WendyClient) SendSetpoint(ctx context.Context, commonAddress uint16, ioa uint32, kind string, value any) error {
+	if c.client == nil || !c.client.IsConnected() {
+		if err := c.Connect(ctx); err != nil {
+			return err
+		}
+	}
+	typeID := asdu.C_SE_NC_1
+	switch kind {
+	case "normalized":
+		typeID = asdu.C_SE_NA_1
+	case "scaled":
+		typeID = asdu.C_SE_NB_1
+	case "float":
+		typeID = asdu.C_SE_NC_1
+	default:
+		return fmt.Errorf("%w: unsupported setpoint kind %q", ErrUnsupportedType, kind)
+	}
+	return mapWendyError(c.client.SendCmd(commonAddress, typeID, asdu.InfoObjAddr(ioa), value))
+}
+
 type wendyCallback struct {
 	events chan<- PointValue
 }

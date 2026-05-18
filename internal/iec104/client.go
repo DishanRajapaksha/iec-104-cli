@@ -14,6 +14,7 @@ type Client interface {
 	Read(ctx context.Context, commonAddress uint16, ioa uint32) (PointValue, error)
 	SendSingleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value bool) error
 	SendDoubleCommand(ctx context.Context, commonAddress uint16, ioa uint32, value uint8) error
+	SendSetpoint(ctx context.Context, commonAddress uint16, ioa uint32, kind string, value any) error
 }
 
 type ClientConfig struct {

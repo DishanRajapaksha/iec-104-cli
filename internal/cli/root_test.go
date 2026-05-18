@@ -117,6 +117,33 @@ func TestParseDoubleCommandValue(t *testing.T) {
 	}
 }
 
+func TestRunSetpointFloatDryRun(t *testing.T) {
+	if got := Run([]string{"setpoint", "float", "--ioa", "2002", "--value", "12.5", "--dry-run"}); got != exitcode.Success {
+		t.Fatalf("Run(setpoint float dry run) = %d, want %d", got, exitcode.Success)
+	}
+}
+
+func TestParseSetpointValue(t *testing.T) {
+	normalized, _, err := parseSetpointValue("normalized", "0.5")
+	if err != nil {
+		t.Fatalf("parse normalized returned error: %v", err)
+	}
+	if normalized.(int16) == 0 {
+		t.Fatal("normalized setpoint was not converted")
+	}
+	scaled, _, err := parseSetpointValue("scaled", "42")
+	if err != nil || scaled.(int16) != 42 {
+		t.Fatalf("parse scaled = %#v, %v; want 42, nil", scaled, err)
+	}
+	floatValue, _, err := parseSetpointValue("float", "12.5")
+	if err != nil || floatValue.(float32) != 12.5 {
+		t.Fatalf("parse float = %#v, %v; want 12.5, nil", floatValue, err)
+	}
+	if _, _, err := parseSetpointValue("normalized", "2"); err == nil {
+		t.Fatal("expected normalized range error")
+	}
+}
+
 func TestParseGlobalOptionsDefaults(t *testing.T) {
 	opts, rest, err := parseGlobalOptions([]string{"help"})
 	if err != nil {

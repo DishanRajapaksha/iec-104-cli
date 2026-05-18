@@ -82,10 +82,135 @@ func Run(args []string) int {
 		return runRead(opts, rest[1:])
 	case "command":
 		return runCommand(opts, rest[1:])
+	case "setpoint":
+		return runSetpoint(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
+	}
+}
+
+func runSetpoint(opts globalOptions, args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "setpoint type is required")
+		return exitcode.ConfigError
+	}
+	switch args[0] {
+	case "normalized", "scaled", "float":
+		return runSetpointKind(opts, args[0], args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown setpoint type %q\n", args[0])
+		return exitcode.ConfigError
+	}
+}
+
+func runSetpointKind(opts globalOptions, kind string, args []string) int {
+	fs := flag.NewFlagSet("setpoint "+kind, flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	commonAddress := uint(0)
+	ioa := uint(0)
+	rawValue := ""
+	safety := controlSafety{}
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "setpoint timeout")
+	fs.UintVar(&commonAddress, "common-address", 0, "common address")
+	fs.UintVar(&ioa, "ioa", 0, "information object address")
+	fs.StringVar(&rawValue, "value", "", "setpoint value")
+	fs.BoolVar(&safety.DryRun, "dry-run", false, "print setpoint without sending")
+	fs.BoolVar(&safety.Yes, "yes", false, "send the setpoint")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if err := safety.Validate(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	if ioa == 0 {
+		fmt.Fprintln(os.Stderr, "--ioa is required")
+		return exitcode.ConfigError
+	}
+	value, display, err := parseSetpointValue(kind, rawValue)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	visited := visitedFlags(fs)
+	applyConnectionFlagOverrides(cfg, visited, host, port, timeout)
+	if visited["common-address"] {
+		cfg.IEC104.CommonAddress = uint16(commonAddress)
+	}
+
+	fmt.Fprintf(os.Stdout, "Setpoint command: %s\n", kind)
+	fmt.Fprintf(os.Stdout, "Common address: %d\n", cfg.IEC104.CommonAddress)
+	fmt.Fprintf(os.Stdout, "IOA: %d\n", ioa)
+	fmt.Fprintf(os.Stdout, "Type: %s\n", kind)
+	fmt.Fprintf(os.Stdout, "Value: %s\n", display)
+	fmt.Fprintf(os.Stdout, "Qualifier: no_additional_definition\n")
+	if !safety.AllowsExecution() {
+		fmt.Fprintln(os.Stdout, "Mode: dry-run")
+		fmt.Fprintln(os.Stdout, "Result: not sent")
+		return exitcode.Success
+	}
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
+	defer cancel()
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	if err := client.SendSetpoint(ctx, cfg.IEC104.CommonAddress, uint32(ioa), kind, value); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return mapRunError(err)
+	}
+	fmt.Fprintln(os.Stdout, "Mode: execute")
+	fmt.Fprintln(os.Stdout, "Result: sent")
+	return exitcode.Success
+}
+
+func parseSetpointValue(kind string, raw string) (any, string, error) {
+	if raw == "" {
+		return nil, "", fmt.Errorf("--value is required")
+	}
+	switch kind {
+	case "normalized":
+		value, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid normalized setpoint %q: %w", raw, err)
+		}
+		if value < -1 || value > 1 {
+			return nil, "", fmt.Errorf("normalized setpoint must be between -1 and 1")
+		}
+		return int16(value * 32767), fmt.Sprintf("%g", value), nil
+	case "scaled":
+		value, err := strconv.ParseInt(raw, 10, 16)
+		if err != nil {
+			return nil, "", fmt.Errorf("scaled setpoint must be a 16-bit integer: %w", err)
+		}
+		return int16(value), fmt.Sprintf("%d", value), nil
+	case "float":
+		value, err := strconv.ParseFloat(raw, 32)
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid float setpoint %q: %w", raw, err)
+		}
+		return float32(value), fmt.Sprintf("%g", value), nil
+	default:
+		return nil, "", fmt.Errorf("unknown setpoint type %q", kind)
 	}
 }
 
@@ -860,9 +985,9 @@ Available commands:
   watch            Print latest cached values on an interval
   read             Send IEC 104 read for a specific IOA
   command          Run control commands with dry-run safety
+  setpoint         Run setpoint commands with dry-run safety
 
 Planned commands:
-  setpoint
   clock-sync
   completions
 

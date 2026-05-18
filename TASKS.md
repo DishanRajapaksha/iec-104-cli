@@ -576,7 +576,7 @@ iec-104-cli command double --ioa 1001 --value close --dry-run
 
 ## Task 17: Add setpoint commands
 
-Status: [ ]
+Status: [x]
 
 Implement setpoint commands.
 
