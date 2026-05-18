@@ -75,10 +75,105 @@ func Run(args []string) int {
 		return runListen(opts, rest[1:])
 	case "interrogate":
 		return runInterrogate(opts, rest[1:])
+	case "watch":
+		return runWatch(opts, rest[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", rest[0])
 		printHelp(os.Stderr)
 		return exitcode.GeneralError
+	}
+}
+
+func runWatch(opts globalOptions, args []string) int {
+	fs := flag.NewFlagSet("watch", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	configPath := opts.ConfigPath
+	profile := opts.Profile
+	host := ""
+	port := 0
+	timeout := opts.Timeout
+	interval := time.Second
+	staleAfter := 30 * time.Second
+	ioa := uint(0)
+	pointName := ""
+	format := opts.Format
+	fs.StringVar(&configPath, "config", configPath, "YAML config file")
+	fs.StringVar(&profile, "profile", profile, "config profile name")
+	fs.StringVar(&host, "host", "", "IEC 104 server host")
+	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
+	fs.DurationVar(&timeout, "timeout", timeout, "connection timeout")
+	fs.DurationVar(&interval, "interval", interval, "print interval")
+	fs.DurationVar(&staleAfter, "stale-after", staleAfter, "mark values stale after this age")
+	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
+	fs.StringVar(&pointName, "point", "", "filter by configured point name")
+	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	_ = profile
+	if interval <= 0 {
+		fmt.Fprintln(os.Stderr, "--interval must be positive")
+		return exitcode.ConfigError
+	}
+	if staleAfter <= 0 {
+		fmt.Fprintln(os.Stderr, "--stale-after must be positive")
+		return exitcode.ConfigError
+	}
+	if _, ok := allowedFormats[format]; !ok {
+		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl\n", format)
+		return exitcode.ConfigError
+	}
+
+	cfg, _, err := config.Load(configPath, config.Overrides{})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	applyConnectionFlagOverrides(cfg, visitedFlags(fs), host, port, timeout)
+	if err := config.Validate(*cfg); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	filter, err := buildPointFilter(*cfg, 0, uint32(ioa), pointName)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cache := iec104.NewLatestCache()
+	errCh := make(chan error, 1)
+	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts.Debug))
+	go func() {
+		errCh <- client.Listen(ctx, func(value iec104.PointValue) {
+			cache.Update(value)
+		})
+	}()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-errCh:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				fmt.Fprintln(os.Stderr, err)
+				return mapRunError(err)
+			}
+			return exitcode.Success
+		case now := <-ticker.C:
+			values := cache.Snapshot(now, staleAfter)
+			filtered := make([]iec104.PointValue, 0, len(values))
+			for _, value := range values {
+				if enriched, ok := filter(value); ok {
+					filtered = append(filtered, enriched)
+				}
+			}
+			if err := writePointValues(os.Stdout, format, filtered); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return exitcode.OutputError
+			}
+		}
 	}
 }
 
@@ -476,9 +571,9 @@ Available commands:
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values
   interrogate      Send general interrogation and print matching values
+  watch            Print latest cached values on an interval
 
 Planned commands:
-  watch
   read
   command
   setpoint

@@ -12,6 +12,7 @@ type PointValue struct {
 	Value         any       `json:"value"`
 	Unit          string    `json:"unit,omitempty"`
 	Quality       Quality   `json:"quality"`
+	Stale         bool      `json:"stale,omitempty"`
 	RawTypeID     uint8     `json:"raw_type_id,omitempty"`
 }
 

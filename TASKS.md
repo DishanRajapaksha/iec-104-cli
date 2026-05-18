@@ -427,7 +427,7 @@ iec-104-cli listen --ioa 1001
 
 ## Task 12: Add latest-value cache and `watch`
 
-Status: [ ]
+Status: [x]
 
 Implement latest-value cache and watch command.
 
