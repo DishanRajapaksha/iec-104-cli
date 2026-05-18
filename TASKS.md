@@ -669,7 +669,7 @@ iec-104-cli completions zsh > /tmp/_iec-104-cli
 
 ## Task 21: Add stable exit codes
 
-Status: [ ]
+Status: [x]
 
 Implement and document stable exit codes.
 

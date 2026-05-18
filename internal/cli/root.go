@@ -973,6 +973,14 @@ func mapRunError(err error) int {
 		return exitcode.TCPConnectionError
 	case errors.Is(err, iec104.ErrSession):
 		return exitcode.IEC104SessionError
+	case errors.Is(err, iec104.ErrInterrogationTimeout):
+		return exitcode.InterrogationTimeout
+	case errors.Is(err, iec104.ErrUnsupportedType):
+		return exitcode.UnsupportedASDU
+	case errors.Is(err, iec104.ErrCommandRejected):
+		return exitcode.CommandRejected
+	case errors.Is(err, iec104.ErrCommandTimeout):
+		return exitcode.CommandTimeout
 	default:
 		return exitcode.GeneralError
 	}

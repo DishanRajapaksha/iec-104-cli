@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/DishanRajapaksha/iec-104-cli/internal/exitcode"
+	"github.com/DishanRajapaksha/iec-104-cli/internal/iec104"
 )
 
 func TestRunHelp(t *testing.T) {
@@ -159,6 +161,22 @@ func TestRunVerboseDoesNotChangeExitCode(t *testing.T) {
 func TestRunCompletionsBash(t *testing.T) {
 	if got := Run([]string{"completions", "bash"}); got != exitcode.Success {
 		t.Fatalf("Run(completions bash) = %d, want %d", got, exitcode.Success)
+	}
+}
+
+func TestMapRunError(t *testing.T) {
+	tests := map[error]int{
+		fmt.Errorf("wrap: %w", iec104.ErrTCPConnection):        exitcode.TCPConnectionError,
+		fmt.Errorf("wrap: %w", iec104.ErrSession):              exitcode.IEC104SessionError,
+		fmt.Errorf("wrap: %w", iec104.ErrUnsupportedType):      exitcode.UnsupportedASDU,
+		fmt.Errorf("wrap: %w", iec104.ErrCommandRejected):      exitcode.CommandRejected,
+		fmt.Errorf("wrap: %w", iec104.ErrCommandTimeout):       exitcode.CommandTimeout,
+		fmt.Errorf("wrap: %w", iec104.ErrInterrogationTimeout): exitcode.InterrogationTimeout,
+	}
+	for err, want := range tests {
+		if got := mapRunError(err); got != want {
+			t.Fatalf("mapRunError(%v) = %d, want %d", err, got, want)
+		}
 	}
 }
 
