@@ -29,6 +29,12 @@ func TestRunSubcommandHelpSucceeds(t *testing.T) {
 	}
 }
 
+func TestRunCompletionsHelpSucceeds(t *testing.T) {
+	if got := Run([]string{"completions", "--help"}); got != exitcode.Success {
+		t.Fatalf("Run(completions --help) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestRunUnknownCommand(t *testing.T) {
 	if got := Run([]string{"bogus"}); got != exitcode.GeneralError {
 		t.Fatalf("Run(bogus) = %d, want %d", got, exitcode.GeneralError)

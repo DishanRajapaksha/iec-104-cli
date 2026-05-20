@@ -207,6 +207,11 @@ func flagParseExitCode(err error) int {
 }
 
 func runCompletions(args []string) int {
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		fmt.Fprintln(os.Stderr, "Usage of completions:")
+		fmt.Fprintln(os.Stderr, "  iec-104-cli completions bash|zsh")
+		return exitcode.Success
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "usage: iec-104-cli completions bash|zsh")
 		return exitcode.ConfigError
