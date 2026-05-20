@@ -81,6 +81,12 @@ func TestRunListenRejectsUnknownFormat(t *testing.T) {
 	}
 }
 
+func TestRunMonitorAliasRejectsUnknownFormat(t *testing.T) {
+	if got := Run([]string{"monitor", "--format", "yaml"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(monitor invalid format) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestRunInterrogateRejectsUnknownPoint(t *testing.T) {
 	if got := Run([]string{"interrogate", "--config", "config.example.yaml", "--point", "missing"}); got != exitcode.ConfigError {
 		t.Fatalf("Run(interrogate unknown point) = %d, want %d", got, exitcode.ConfigError)

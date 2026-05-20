@@ -174,6 +174,8 @@ func Run(args []string) int {
 		return runTestConnection(opts, rest[1:])
 	case "listen":
 		return runListen(opts, rest[1:])
+	case "monitor":
+		return runListen(opts, rest[1:])
 	case "interrogate":
 		return runInterrogate(opts, rest[1:])
 	case "watch":
@@ -1386,6 +1388,7 @@ Available commands:
   status           Run TCP and IEC 104 STARTDT diagnostics
   test-connection  Run TCP and IEC 104 STARTDT diagnostics
   listen           Print incoming point values
+  monitor          Print incoming point values
   interrogate      Send general interrogation and print matching values
   watch            Print latest cached values on an interval
   read             Send IEC 104 read for a specific IOA

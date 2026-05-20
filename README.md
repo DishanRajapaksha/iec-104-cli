@@ -9,6 +9,7 @@
 | Validate local config | `iec-104-cli validate-config` |
 | Test TCP and STARTDT | `iec-104-cli test-connection` |
 | Listen for incoming values | `iec-104-cli listen --duration 10s --format jsonl` |
+| Monitor incoming values | `iec-104-cli monitor --duration 10s --format jsonl` |
 | Run general interrogation | `iec-104-cli interrogate --common-address 1 --format table` |
 | Watch latest cached value | `iec-104-cli watch --point active_power --interval 1s` |
 | Read one IOA | `iec-104-cli read --ioa 1001` |
@@ -122,7 +123,10 @@ Listen for spontaneous or incoming values:
 
 ```bash
 iec-104-cli listen --duration 10s --format jsonl
+iec-104-cli monitor --duration 10s --format jsonl
 ```
+
+`monitor` is an alias for `listen`.
 
 Run general interrogation:
 
