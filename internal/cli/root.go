@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -96,6 +97,28 @@ var allowedFormats = map[string]struct{}{
 	"json":  {},
 	"jsonl": {},
 	"csv":   {},
+}
+
+type uintList []uint
+
+func (l *uintList) String() string {
+	values := make([]string, 0, len(*l))
+	for _, value := range *l {
+		values = append(values, strconv.FormatUint(uint64(value), 10))
+	}
+	return strings.Join(values, ",")
+}
+
+func (l *uintList) Set(value string) error {
+	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 32)
+	if err != nil {
+		return fmt.Errorf("invalid unsigned integer %q: %w", value, err)
+	}
+	if parsed == 0 {
+		return fmt.Errorf("value must be greater than zero")
+	}
+	*l = append(*l, uint(parsed))
+	return nil
 }
 
 type globalOptions struct {
@@ -594,7 +617,8 @@ func runRead(opts globalOptions, args []string) int {
 	port := 0
 	timeout := opts.Timeout
 	commonAddress := uint(0)
-	ioa := uint(0)
+	var ioas uintList
+	ioasFile := ""
 	format := opts.Format
 	verbose := opts.Verbose
 	debug := opts.Debug
@@ -605,7 +629,8 @@ func runRead(opts globalOptions, args []string) int {
 	fs.IntVar(&port, "port", 0, "IEC 104 server TCP port")
 	fs.DurationVar(&timeout, "timeout", timeout, "read timeout")
 	fs.UintVar(&commonAddress, "common-address", 0, "common address")
-	fs.UintVar(&ioa, "ioa", 0, "information object address to read")
+	fs.Var(&ioas, "ioa", "information object address to read; repeat for multiple IOAs")
+	fs.StringVar(&ioasFile, "ioas", "", "path to file with one IOA per line")
 	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
@@ -616,8 +641,14 @@ func runRead(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	if ioa == 0 {
-		fmt.Fprintln(os.Stderr, "--ioa is required")
+	fileIOAs, err := readIOAsFile(ioasFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.ConfigError
+	}
+	allIOAs := append([]uint(ioas), fileIOAs...)
+	if len(allIOAs) == 0 {
+		fmt.Fprintln(os.Stderr, "at least one --ioa is required")
 		return exitcode.ConfigError
 	}
 	if _, ok := allowedFormats[format]; !ok {
@@ -639,34 +670,70 @@ func runRead(opts globalOptions, args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
-	filter, err := buildPointFilter(*cfg, 0, uint32(ioa), "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return exitcode.ConfigError
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Connection.Timeout.Duration())
 	defer cancel()
 	client := iec104.NewWendyClient(clientConfigFromConfig(*cfg, opts))
-	value, err := client.Read(ctx, cfg.IEC104.CommonAddress, uint32(ioa))
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-		fmt.Fprintf(os.Stderr, "read timed out waiting for IOA %d; some IEC 104 devices do not support read and expect interrogation or spontaneous updates instead\n", ioa)
-		return exitcode.InterrogationTimeout
+	values := make([]iec104.PointValue, 0, len(allIOAs))
+	for _, ioa := range allIOAs {
+		filter, err := buildPointFilter(*cfg, 0, uint32(ioa), "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.ConfigError
+		}
+		value, err := client.Read(ctx, cfg.IEC104.CommonAddress, uint32(ioa))
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			fmt.Fprintf(os.Stderr, "read timed out waiting for IOA %d; some IEC 104 devices do not support read and expect interrogation or spontaneous updates instead\n", ioa)
+			return exitcode.InterrogationTimeout
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return mapRunError(err)
+		}
+		enriched, ok := filter(value)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "read response did not match IOA %d\n", ioa)
+			return exitcode.GeneralError
+		}
+		values = append(values, enriched)
 	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return mapRunError(err)
-	}
-	enriched, ok := filter(value)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "read response did not match IOA %d\n", ioa)
-		return exitcode.GeneralError
-	}
-	if err := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); err != nil {
+	if err := writePointValues(os.Stdout, format, values); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.OutputError
 	}
 	return exitcode.Success
+}
+
+func readIOAsFile(path string) ([]uint, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("read IOAs file %q: %w", path, err)
+	}
+	defer file.Close()
+
+	var ioas []uint
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parsed, err := strconv.ParseUint(line, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("read IOAs file %q: invalid IOA %q: %w", path, line, err)
+		}
+		if parsed == 0 {
+			return nil, fmt.Errorf("read IOAs file %q: IOA must be greater than zero", path)
+		}
+		ioas = append(ioas, uint(parsed))
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read IOAs file %q: %w", path, err)
+	}
+	return ioas, nil
 }
 
 func runWatch(opts globalOptions, args []string) int {

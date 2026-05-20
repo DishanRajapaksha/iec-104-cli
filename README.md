@@ -12,6 +12,7 @@
 | Run general interrogation | `iec-104-cli interrogate --common-address 1 --format table` |
 | Watch latest cached value | `iec-104-cli watch --point active_power --interval 1s` |
 | Read one IOA | `iec-104-cli read --ioa 1001` |
+| Read multiple IOAs | `iec-104-cli read --ioa 1001 --ioa 1002` |
 | Dry-run a single command | `iec-104-cli command single --ioa 1000 --value on` |
 | Execute a single command | `iec-104-cli command single --ioa 1000 --value on --yes` |
 | Dry-run a setpoint | `iec-104-cli setpoint float --ioa 2002 --value 12.5` |
@@ -142,6 +143,8 @@ Read a specific IOA:
 
 ```bash
 iec-104-cli read --ioa 1001 --format json
+iec-104-cli read --ioa 1001 --ioa 1002 --format jsonl
+iec-104-cli read --ioas ioas.txt --format jsonl
 ```
 
 IEC 104 read is not equivalent to OPC UA read. Many devices prefer interrogation or spontaneous updates and may not answer read commands.

@@ -99,6 +99,30 @@ func TestRunReadRequiresIOA(t *testing.T) {
 	}
 }
 
+func TestReadIOAsFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ioas.txt")
+	if err := os.WriteFile(path, []byte("# comment\n1001\n\n1002\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ioas, err := readIOAsFile(path)
+	if err != nil {
+		t.Fatalf("readIOAsFile returned error: %v", err)
+	}
+	if len(ioas) != 2 || ioas[0] != 1001 || ioas[1] != 1002 {
+		t.Fatalf("ioas = %#v, want [1001 1002]", ioas)
+	}
+}
+
+func TestReadIOAsFileRejectsInvalidValue(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ioas.txt")
+	if err := os.WriteFile(path, []byte("nope\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readIOAsFile(path); err == nil {
+		t.Fatal("expected invalid IOA error")
+	}
+}
+
 func TestRunCommandSingleDefaultsToDryRun(t *testing.T) {
 	if got := Run([]string{"command", "single", "--ioa", "1000", "--value", "on"}); got != exitcode.Success {
 		t.Fatalf("Run(command single dry run) = %d, want %d", got, exitcode.Success)
