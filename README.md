@@ -59,6 +59,8 @@ iec-104-cli init-config
 iec-104-cli validate-config
 ```
 
+## Config and Profiles
+
 Config files default to `config.yaml`. Use `--config site.yaml` to select another file, and `--profile plant-a` to select a named profile from that file.
 
 ## Config Example
@@ -101,7 +103,7 @@ profiles:
       format: json
 ```
 
-## Commands
+## Core Commands
 
 Validate local config without connecting:
 
@@ -223,10 +225,17 @@ iec-104-cli generate-configs --dir examples
 9  output or formatting error
 ```
 
-## Troubleshooting
+## Troubleshooting and Diagnostics
 
 Use `validate-config` first to catch local YAML and point definition problems.
 
 Use `test-connection --verbose` to separate TCP connection failures from IEC 104 STARTDT/session failures.
 
 Use `listen --debug --format jsonl` when checking spontaneous updates. Debug logs are written to stderr.
+
+## Command Help
+
+```bash
+iec-104-cli help
+iec-104-cli read --help
+```
