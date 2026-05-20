@@ -181,6 +181,7 @@ table
 text
 json
 jsonl
+csv
 ```
 
 Verbose and debug logs go to stderr so JSON and JSONL stdout remain script-friendly.
