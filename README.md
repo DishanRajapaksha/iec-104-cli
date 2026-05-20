@@ -195,19 +195,23 @@ csv
 
 Verbose and debug logs go to stderr so JSON and JSONL stdout remain script-friendly.
 
+## Troubleshooting and Diagnostics
+
+Use `validate-config` first to catch local YAML and point definition problems.
+
+Use `test-connection --verbose` to separate TCP connection failures from IEC 104 STARTDT/session failures.
+
+Use `listen --debug --format jsonl` when checking spontaneous updates. Debug logs are written to stderr.
+
 ## Shell Completions
 
 ```bash
-iec-104-cli completions bash > /tmp/iec-104-cli.bash
-iec-104-cli completions zsh > /tmp/_iec-104-cli
-```
+# bash
+iec-104-cli completions bash > /etc/bash_completion.d/iec-104-cli
 
-## Example Config Files
-
-Generate multi-file examples, including point CSV/YAML examples:
-
-```bash
-iec-104-cli generate-configs --dir examples
+# zsh
+mkdir -p "${HOME}/.zsh/completions"
+iec-104-cli completions zsh > "${HOME}/.zsh/completions/_iec-104-cli"
 ```
 
 ## Exit Codes
@@ -225,13 +229,13 @@ iec-104-cli generate-configs --dir examples
 9  output or formatting error
 ```
 
-## Troubleshooting and Diagnostics
+## Example Config Files
 
-Use `validate-config` first to catch local YAML and point definition problems.
+Generate multi-file examples, including point CSV/YAML examples:
 
-Use `test-connection --verbose` to separate TCP connection failures from IEC 104 STARTDT/session failures.
-
-Use `listen --debug --format jsonl` when checking spontaneous updates. Debug logs are written to stderr.
+```bash
+iec-104-cli generate-configs --dir examples
+```
 
 ## Command Help
 
