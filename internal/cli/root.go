@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -303,12 +304,27 @@ func runSetpoint(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 	switch args[0] {
+	case "--help", "-h":
+		printSetpointHelp(os.Stderr)
+		return exitcode.Success
 	case "normalized", "scaled", "float":
 		return runSetpointKind(opts, args[0], args[1:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown setpoint type %q\n", args[0])
 		return exitcode.ConfigError
 	}
+}
+
+func printSetpointHelp(w io.Writer) {
+	fmt.Fprintln(w, `Usage of setpoint:
+  iec-104-cli setpoint normalized [flags]
+  iec-104-cli setpoint scaled [flags]
+  iec-104-cli setpoint float [flags]
+
+Types:
+  normalized  Send normalized setpoint value between -1 and 1
+  scaled      Send 16-bit scaled setpoint value
+  float       Send floating-point setpoint value`)
 }
 
 func runSetpointKind(opts globalOptions, kind string, args []string) int {
@@ -427,6 +443,9 @@ func runCommand(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 	switch args[0] {
+	case "--help", "-h":
+		printCommandHelp(os.Stderr)
+		return exitcode.Success
 	case "single":
 		return runCommandSingle(opts, args[1:])
 	case "double":
@@ -435,6 +454,16 @@ func runCommand(opts globalOptions, args []string) int {
 		fmt.Fprintf(os.Stderr, "unknown command type %q\n", args[0])
 		return exitcode.ConfigError
 	}
+}
+
+func printCommandHelp(w io.Writer) {
+	fmt.Fprintln(w, `Usage of command:
+  iec-104-cli command single [flags]
+  iec-104-cli command double [flags]
+
+Types:
+  single  Send single command value: on, off, true, false, 1, or 0
+  double  Send double command value: on, off, open, close, intermediate, or indeterminate`)
 }
 
 func runCommandSingle(opts globalOptions, args []string) int {

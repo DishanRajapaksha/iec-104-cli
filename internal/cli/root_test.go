@@ -35,6 +35,15 @@ func TestRunCompletionsHelpSucceeds(t *testing.T) {
 	}
 }
 
+func TestRunNestedCommandHelpSucceeds(t *testing.T) {
+	if got := Run([]string{"command", "--help"}); got != exitcode.Success {
+		t.Fatalf("Run(command --help) = %d, want %d", got, exitcode.Success)
+	}
+	if got := Run([]string{"setpoint", "--help"}); got != exitcode.Success {
+		t.Fatalf("Run(setpoint --help) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestRunUnknownCommand(t *testing.T) {
 	if got := Run([]string{"bogus"}); got != exitcode.GeneralError {
 		t.Fatalf("Run(bogus) = %d, want %d", got, exitcode.GeneralError)
