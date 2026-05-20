@@ -1123,14 +1123,14 @@ func runTestConnection(opts globalOptions, args []string) int {
 		logDebug(opts, "test-connection failed: %v", err)
 		fmt.Fprintf(os.Stdout, "TCP: failed\n")
 		fmt.Fprintf(os.Stdout, "IEC104 STARTDT: not started\n")
-		fmt.Fprintf(os.Stdout, "Result: failed\n")
+		fmt.Fprintf(os.Stdout, "RESULT: FAIL\n")
 		fmt.Fprintln(os.Stderr, err)
 		return mapRunError(err)
 	}
 
 	fmt.Fprintf(os.Stdout, "TCP: ok\n")
 	fmt.Fprintf(os.Stdout, "IEC104 STARTDT: ok\n")
-	fmt.Fprintf(os.Stdout, "Result: connected\n")
+	fmt.Fprintf(os.Stdout, "RESULT: PASS\n")
 	logVerbose(opts, "connection test succeeded")
 	return exitcode.Success
 }
