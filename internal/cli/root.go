@@ -1412,6 +1412,13 @@ func printHelp(out *os.File) {
 
 Usage:
   %s [global flags] <command> [flags]
+  %s test-connection --host 127.0.0.1 --port 2404
+  %s read --ioa 1001
+  %s listen --duration 10s --format jsonl
+  %s interrogate --common-address 1 --format table
+  %s command single --ioa 1000 --value on
+  %s init-config
+  %s version
 
 Common flags:
   --config string     Config file path (default "config.yaml")
@@ -1440,5 +1447,5 @@ Available commands:
   clock-sync       Run clock synchronization with dry-run safety
   completions
 
-`, appName, appName)
+`, appName, appName, appName, appName, appName, appName, appName, appName, appName)
 }
