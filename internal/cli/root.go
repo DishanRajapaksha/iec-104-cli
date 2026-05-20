@@ -207,7 +207,6 @@ func runClockSync(opts globalOptions, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
-	_ = profile
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -222,7 +221,7 @@ func runClockSync(opts globalOptions, args []string) int {
 		syncTime = parsed
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -298,7 +297,6 @@ func runSetpointKind(opts globalOptions, kind string, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
-	_ = profile
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -313,7 +311,7 @@ func runSetpointKind(opts globalOptions, kind string, args []string) int {
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -425,7 +423,6 @@ func runCommandSingle(opts globalOptions, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
-	_ = profile
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -444,7 +441,7 @@ func runCommandSingle(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -521,7 +518,6 @@ func runCommandDouble(opts globalOptions, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
-	_ = profile
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -536,7 +532,7 @@ func runCommandDouble(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -620,7 +616,6 @@ func runRead(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	_ = profile
 	if ioa == 0 {
 		fmt.Fprintln(os.Stderr, "--ioa is required")
 		return exitcode.ConfigError
@@ -630,7 +625,7 @@ func runRead(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -713,7 +708,6 @@ func runWatch(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	_ = profile
 	if interval <= 0 {
 		fmt.Fprintln(os.Stderr, "--interval must be positive")
 		return exitcode.ConfigError
@@ -727,7 +721,7 @@ func runWatch(opts globalOptions, args []string) int {
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -837,13 +831,12 @@ func runInterrogate(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -925,13 +918,12 @@ func runListen(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	_ = profile
 	if _, ok := allowedFormats[format]; !ok {
 		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
 		return exitcode.ConfigError
 	}
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -1020,9 +1012,8 @@ func runTestConnection(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	_ = profile
 
-	cfg, _, err := config.Load(configPath, config.Overrides{})
+	cfg, _, err := config.LoadForProfile(configPath, profile, config.Overrides{})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
@@ -1167,9 +1158,8 @@ func runValidateConfig(opts globalOptions, args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return exitcode.ConfigError
 	}
-	_ = profile
 
-	cfg, err := config.LoadRequired(configPath, config.Overrides{OutputFormat: &opts.Format})
+	cfg, err := config.LoadRequiredForProfile(configPath, profile, config.Overrides{OutputFormat: &opts.Format})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError

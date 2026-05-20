@@ -28,3 +28,18 @@ points:
     ioa: 1001
     type: float
     unit: MW
+
+# Optional named profiles. A profile uses the same schema as the top-level
+# config and overrides only the fields it sets.
+default_profile: plant-a
+profiles:
+  plant-a:
+    connection:
+      host: 127.0.0.1
+    iec104:
+      common_address: 1
+    points:
+      - name: active_power
+        ioa: 1001
+        type: float
+        unit: MW

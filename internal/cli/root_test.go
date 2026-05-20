@@ -41,6 +41,28 @@ func TestRunValidateConfigMissingFile(t *testing.T) {
 	}
 }
 
+func TestRunValidateConfigWithProfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(`connection:
+  host: 192.0.2.10
+profiles:
+  site-a:
+    connection:
+      host: 192.0.2.20
+    points:
+      - name: active_power
+        ioa: 1001
+        type: float
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := Run([]string{"validate-config", "--config", path, "--profile", "site-a"}); got != exitcode.Success {
+		t.Fatalf("Run(validate-config profile) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestRunTestConnectionRequiresHost(t *testing.T) {
 	if got := Run([]string{"test-connection", "--config", "missing-test-config.yaml"}); got != exitcode.ConfigError {
 		t.Fatalf("Run(test-connection missing host) = %d, want %d", got, exitcode.ConfigError)

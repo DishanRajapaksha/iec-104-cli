@@ -40,7 +40,7 @@ cp config.example.yaml config.yaml
 iec-104-cli validate-config
 ```
 
-Config files default to `config.yaml`. Use `--config site.yaml` to select another file.
+Config files default to `config.yaml`. Use `--config site.yaml` to select another file, and `--profile plant-a` to select a named profile from that file.
 
 ## Config Example
 
@@ -70,6 +70,16 @@ points:
     ioa: 1001
     type: float
     unit: MW
+
+default_profile: plant-a
+profiles:
+  plant-a:
+    connection:
+      host: 192.0.2.10
+    iec104:
+      common_address: 7
+    output:
+      format: json
 ```
 
 ## Commands
@@ -78,6 +88,7 @@ Validate local config without connecting:
 
 ```bash
 iec-104-cli validate-config --config config.example.yaml
+iec-104-cli validate-config --config config.yaml --profile plant-a
 ```
 
 Test TCP and IEC 104 STARTDT:

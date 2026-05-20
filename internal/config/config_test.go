@@ -87,6 +87,100 @@ points:
 	}
 }
 
+func TestLoadForProfileMergesNamedProfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(`connection:
+  host: 192.0.2.10
+  port: 2404
+iec104:
+  common_address: 1
+output:
+  format: table
+profiles:
+  site-a:
+    connection:
+      host: 192.0.2.20
+      timeout: 15s
+    iec104:
+      common_address: 7
+    output:
+      format: json
+    points:
+      - name: active_power
+        ioa: 1001
+        type: float
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, found, err := LoadForProfile(path, "site-a", Overrides{})
+	if err != nil {
+		t.Fatalf("LoadForProfile returned error: %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if cfg.Connection.Host != "192.0.2.20" {
+		t.Fatalf("host = %q, want profile host", cfg.Connection.Host)
+	}
+	if cfg.Connection.Port != 2404 {
+		t.Fatalf("port = %d, want base port", cfg.Connection.Port)
+	}
+	if cfg.Connection.Timeout.Duration() != 15*time.Second {
+		t.Fatalf("timeout = %s, want profile timeout", cfg.Connection.Timeout.Duration())
+	}
+	if cfg.IEC104.CommonAddress != 7 {
+		t.Fatalf("common address = %d, want 7", cfg.IEC104.CommonAddress)
+	}
+	if cfg.Output.Format != "json" {
+		t.Fatalf("format = %q, want json", cfg.Output.Format)
+	}
+	if len(cfg.Points) != 1 || cfg.Points[0].Name != "active_power" {
+		t.Fatalf("points = %#v", cfg.Points)
+	}
+}
+
+func TestLoadForProfileUsesDefaultProfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(`connection:
+  host: 192.0.2.10
+default_profile: site-a
+profiles:
+  site-a:
+    connection:
+      host: 192.0.2.20
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, _, err := LoadForProfile(path, "", Overrides{})
+	if err != nil {
+		t.Fatalf("LoadForProfile returned error: %v", err)
+	}
+	if cfg.Connection.Host != "192.0.2.20" {
+		t.Fatalf("host = %q, want default profile host", cfg.Connection.Host)
+	}
+}
+
+func TestLoadForProfileMissingProfile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(`profiles:
+  site-a:
+    connection:
+      host: 192.0.2.20
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := LoadForProfile(path, "missing", Overrides{})
+	if err == nil {
+		t.Fatal("expected missing profile error")
+	}
+}
+
 func TestLoadPointFiles(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

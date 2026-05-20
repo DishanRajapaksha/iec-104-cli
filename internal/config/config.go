@@ -60,6 +60,12 @@ type Config struct {
 	Points     []PointConfig    `yaml:"points"`
 }
 
+type FileConfig struct {
+	Config         `yaml:",inline"`
+	DefaultProfile string            `yaml:"default_profile"`
+	Profiles       map[string]Config `yaml:"profiles"`
+}
+
 type ConnectionConfig struct {
 	Host              string   `yaml:"host"`
 	Port              int      `yaml:"port"`
@@ -124,6 +130,10 @@ func Default() Config {
 }
 
 func Load(path string, overrides Overrides) (*Config, bool, error) {
+	return LoadForProfile(path, "", overrides)
+}
+
+func LoadForProfile(path string, profile string, overrides Overrides) (*Config, bool, error) {
 	cfg := Default()
 
 	data, err := os.ReadFile(path)
@@ -135,9 +145,24 @@ func Load(path string, overrides Overrides) (*Config, bool, error) {
 		return &cfg, false, nil
 	}
 
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	file := FileConfig{Config: cfg}
+	if err := yaml.Unmarshal(data, &file); err != nil {
 		return nil, true, fmt.Errorf("failed to parse config: %w", err)
 	}
+	cfg = file.Config
+
+	selectedProfile := profile
+	if selectedProfile == "" {
+		selectedProfile = file.DefaultProfile
+	}
+	if selectedProfile != "" {
+		profileCfg, ok := file.Profiles[selectedProfile]
+		if !ok {
+			return nil, true, fmt.Errorf("profile %q not found", selectedProfile)
+		}
+		cfg = mergeConfig(cfg, profileCfg)
+	}
+
 	if err := loadPointFiles(&cfg, filepath.Dir(path)); err != nil {
 		return nil, true, err
 	}
@@ -246,7 +271,11 @@ func csvOptionalField(record []string, header map[string]int, name string) strin
 }
 
 func LoadRequired(path string, overrides Overrides) (*Config, error) {
-	cfg, found, err := Load(path, overrides)
+	return LoadRequiredForProfile(path, "", overrides)
+}
+
+func LoadRequiredForProfile(path string, profile string, overrides Overrides) (*Config, error) {
+	cfg, found, err := LoadForProfile(path, profile, overrides)
 	if err != nil {
 		return nil, err
 	}
@@ -308,4 +337,70 @@ func applyOverrides(cfg *Config, overrides Overrides) {
 	if overrides.CommonAddress != nil {
 		cfg.IEC104.CommonAddress = *overrides.CommonAddress
 	}
+}
+
+func mergeConfig(base Config, override Config) Config {
+	base.Connection = mergeConnectionConfig(base.Connection, override.Connection)
+	base.IEC104 = mergeIEC104Config(base.IEC104, override.IEC104)
+	base.Output = mergeOutputConfig(base.Output, override.Output)
+	base.Cache = mergeCacheConfig(base.Cache, override.Cache)
+	if override.PointFiles != nil {
+		base.PointFiles = override.PointFiles
+	}
+	if override.Points != nil {
+		base.Points = override.Points
+	}
+	return base
+}
+
+func mergeConnectionConfig(base, override ConnectionConfig) ConnectionConfig {
+	if override.Host != "" {
+		base.Host = override.Host
+	}
+	if override.Port != 0 {
+		base.Port = override.Port
+	}
+	if !override.Timeout.IsZero() {
+		base.Timeout = override.Timeout
+	}
+	if override.Reconnect {
+		base.Reconnect = override.Reconnect
+	}
+	if !override.ReconnectInterval.IsZero() {
+		base.ReconnectInterval = override.ReconnectInterval
+	}
+	return base
+}
+
+func mergeIEC104Config(base, override IEC104Config) IEC104Config {
+	if override.CommonAddress != 0 {
+		base.CommonAddress = override.CommonAddress
+	}
+	if override.OriginatorAddress != 0 {
+		base.OriginatorAddress = override.OriginatorAddress
+	}
+	if override.InterrogationQualifier != 0 {
+		base.InterrogationQualifier = override.InterrogationQualifier
+	}
+	return base
+}
+
+func mergeOutputConfig(base, override OutputConfig) OutputConfig {
+	if override.Format != "" {
+		base.Format = override.Format
+	}
+	if override.Timestamps != "" {
+		base.Timestamps = override.Timestamps
+	}
+	return base
+}
+
+func mergeCacheConfig(base, override CacheConfig) CacheConfig {
+	if override.Enabled {
+		base.Enabled = override.Enabled
+	}
+	if override.Path != "" {
+		base.Path = override.Path
+	}
+	return base
 }
