@@ -112,7 +112,10 @@ Test TCP and IEC 104 STARTDT:
 
 ```bash
 iec-104-cli test-connection --host 127.0.0.1 --port 2404 --timeout 5s
+iec-104-cli status --host 127.0.0.1 --port 2404 --timeout 5s
 ```
+
+`status` is currently an alias for `test-connection`.
 
 Listen for spontaneous or incoming values:
 
@@ -188,6 +191,10 @@ Verbose and debug logs go to stderr so JSON and JSONL stdout remain script-frien
 iec-104-cli completions bash > /tmp/iec-104-cli.bash
 iec-104-cli completions zsh > /tmp/_iec-104-cli
 ```
+
+## Aliases
+
+`init-config` currently generates the same example files as `generate-configs`.
 
 ## Exit Codes
 
