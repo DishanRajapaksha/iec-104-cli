@@ -18,9 +18,11 @@ import (
 )
 
 const (
-	appName           = "iec-104-cli"
-	defaultConfigPath = "config.yaml"
-	defaultFormat     = "table"
+	appName            = "iec-104-cli"
+	defaultConfigPath  = "config.yaml"
+	defaultFormat      = "table"
+	snapshotFormatHelp = "output format: table, text, json, jsonl, csv"
+	streamFormatHelp   = "output format: text, jsonl, csv, table, json"
 )
 
 const generatedBasicConfig = `connection:
@@ -633,7 +635,7 @@ func runRead(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "common address")
 	fs.Var(&ioas, "ioa", "information object address to read; repeat for multiple IOAs")
 	fs.StringVar(&ioasFile, "ioas", "", "path to file with one IOA per line")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
+	fs.StringVar(&format, "format", format, snapshotFormatHelp)
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -767,7 +769,7 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
 	fs.StringVar(&cachePath, "cache", "", "persistent latest-value cache path")
 	fs.BoolVar(&noCache, "no-cache", false, "disable persistent latest-value cache")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
+	fs.StringVar(&format, "format", format, streamFormatHelp)
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -890,7 +892,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "common address to interrogate")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
+	fs.StringVar(&format, "format", format, snapshotFormatHelp)
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
@@ -977,7 +979,7 @@ func runListen(opts globalOptions, args []string) int {
 	fs.UintVar(&commonAddress, "common-address", 0, "filter by common address")
 	fs.UintVar(&ioa, "ioa", 0, "filter by information object address")
 	fs.StringVar(&pointName, "point", "", "filter by configured point name")
-	fs.StringVar(&format, "format", format, "output format: table, text, json, jsonl, csv")
+	fs.StringVar(&format, "format", format, streamFormatHelp)
 	fs.BoolVar(&verbose, "verbose", verbose, "print high-level connection decisions")
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
