@@ -141,6 +141,12 @@ func TestCommandDryRunDoesNotRequireServer(t *testing.T) {
 	}
 }
 
+func TestRunCommandSingleRejectsSafetyConflict(t *testing.T) {
+	if got := Run([]string{"command", "single", "--ioa", "1000", "--value", "on", "--dry-run", "--yes"}); got != exitcode.ConfigError {
+		t.Fatalf("Run(command single --dry-run --yes) = %d, want %d", got, exitcode.ConfigError)
+	}
+}
+
 func TestParseSingleCommandValue(t *testing.T) {
 	for _, value := range []string{"on", "true", "1"} {
 		got, err := parseSingleCommandValue(value)
