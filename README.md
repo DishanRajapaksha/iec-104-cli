@@ -2,6 +2,23 @@
 
 `iec-104-cli` is a script-friendly command-line client for IEC 60870-5-104.
 
+## At a Glance
+
+| Task | Command |
+|---|---|
+| Validate local config | `iec-104-cli validate-config` |
+| Test TCP and STARTDT | `iec-104-cli test-connection` |
+| Listen for incoming values | `iec-104-cli listen --duration 10s --format jsonl` |
+| Run general interrogation | `iec-104-cli interrogate --common-address 1 --format table` |
+| Watch latest cached value | `iec-104-cli watch --point active_power --interval 1s` |
+| Read one IOA | `iec-104-cli read --ioa 1001` |
+| Dry-run a single command | `iec-104-cli command single --ioa 1000 --value on` |
+| Execute a single command | `iec-104-cli command single --ioa 1000 --value on --yes` |
+| Dry-run a setpoint | `iec-104-cli setpoint float --ioa 2002 --value 12.5` |
+| Dry-run clock sync | `iec-104-cli clock-sync` |
+| JSON Lines output | `iec-104-cli listen --duration 10s --format jsonl` |
+| CSV output | `iec-104-cli interrogate --format csv` |
+
 ## Install
 
 Build from source:
