@@ -1413,7 +1413,7 @@ func printHelp(out *os.File) {
 Usage:
   %s [global flags] <command> [flags]
 
-Global flags:
+Common flags:
   --config string     Config file path (default "config.yaml")
   --profile string    Config profile name
   --format string     Output format: table, text, json, jsonl, csv (default "table")
