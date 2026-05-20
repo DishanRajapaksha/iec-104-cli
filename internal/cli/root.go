@@ -144,7 +144,7 @@ func Run(args []string) int {
 	case "generate-configs":
 		return runGenerateConfigs(opts, rest[1:])
 	case "init-config":
-		return runGenerateConfigs(opts, rest[1:])
+		return runInitConfig(opts, rest[1:])
 	case "test-connection":
 		return runTestConnection(opts, rest[1:])
 	case "status":
@@ -1148,6 +1148,37 @@ func runGenerateConfigs(_ globalOptions, args []string) int {
 	return exitcode.Success
 }
 
+func runInitConfig(_ globalOptions, args []string) int {
+	fs := flag.NewFlagSet("init-config", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	outputPath := defaultConfigPath
+	force := false
+	fs.StringVar(&outputPath, "output", outputPath, "output YAML config file")
+	fs.BoolVar(&force, "force", false, "overwrite output file if it exists")
+	if err := fs.Parse(args); err != nil {
+		return exitcode.ConfigError
+	}
+	if strings.TrimSpace(outputPath) == "" {
+		fmt.Fprintln(os.Stderr, "--output is required")
+		return exitcode.ConfigError
+	}
+	if !force {
+		if _, err := os.Stat(outputPath); err == nil {
+			fmt.Fprintf(os.Stderr, "refusing to overwrite existing file %q; use --force to overwrite\n", outputPath)
+			return exitcode.ConfigError
+		} else if !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.ConfigError
+		}
+	}
+	if err := os.WriteFile(outputPath, []byte(generatedBasicConfig), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitcode.OutputError
+	}
+	fmt.Fprintf(os.Stdout, "wrote starter config to %s\n", outputPath)
+	return exitcode.Success
+}
+
 func runValidateConfig(opts globalOptions, args []string) int {
 	fs := flag.NewFlagSet("validate-config", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -1283,7 +1314,7 @@ Available commands:
   help             Show this help message
   version          Show version information
   validate-config  Validate local config without server connection
-  init-config      Generate example config files
+  init-config      Write a starter YAML config file
   generate-configs Generate example config files
   status           Run TCP and IEC 104 STARTDT diagnostics
   test-connection  Run TCP and IEC 104 STARTDT diagnostics

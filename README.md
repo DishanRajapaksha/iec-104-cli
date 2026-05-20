@@ -50,10 +50,10 @@ sudo scripts/fix-shared-permissions.sh
 
 ## First Run
 
-Copy `config.example.yaml` to `config.yaml`, edit the connection and points, then validate it:
+Create `config.yaml`, edit the connection and points, then validate it:
 
 ```bash
-cp config.example.yaml config.yaml
+iec-104-cli init-config
 iec-104-cli validate-config
 ```
 
@@ -193,9 +193,13 @@ iec-104-cli completions bash > /tmp/iec-104-cli.bash
 iec-104-cli completions zsh > /tmp/_iec-104-cli
 ```
 
-## Aliases
+## Example Config Files
 
-`init-config` currently generates the same example files as `generate-configs`.
+Generate multi-file examples, including point CSV/YAML examples:
+
+```bash
+iec-104-cli generate-configs --dir examples
+```
 
 ## Exit Codes
 

@@ -244,13 +244,53 @@ func TestRunGenerateConfigs(t *testing.T) {
 	}
 }
 
-func TestRunInitConfigAlias(t *testing.T) {
+func TestRunInitConfig(t *testing.T) {
 	dir := t.TempDir()
-	if got := Run([]string{"init-config", "--dir", dir}); got != exitcode.Success {
+	path := filepath.Join(dir, "config.yaml")
+	if got := Run([]string{"init-config", "--output", path}); got != exitcode.Success {
 		t.Fatalf("Run(init-config) = %d, want %d", got, exitcode.Success)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "basic.yaml")); err != nil {
-		t.Fatalf("basic.yaml not generated: %v", err)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("config.yaml not generated: %v", err)
+	}
+	if got := Run([]string{"validate-config", "--config", path}); got != exitcode.Success {
+		t.Fatalf("Run(validate-config generated) = %d, want %d", got, exitcode.Success)
+	}
+}
+
+func TestRunInitConfigRefusesOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("existing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := Run([]string{"init-config", "--output", path}); got != exitcode.ConfigError {
+		t.Fatalf("Run(init-config existing) = %d, want %d", got, exitcode.ConfigError)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "existing" {
+		t.Fatalf("existing file was overwritten: %q", string(contents))
+	}
+}
+
+func TestRunInitConfigForce(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte("existing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := Run([]string{"init-config", "--output", path, "--force"}); got != exitcode.Success {
+		t.Fatalf("Run(init-config --force) = %d, want %d", got, exitcode.Success)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) == "existing" {
+		t.Fatal("existing file was not overwritten")
 	}
 }
 
