@@ -23,6 +23,12 @@ func TestRunHelpWithGlobalFormat(t *testing.T) {
 	}
 }
 
+func TestRunSubcommandHelpSucceeds(t *testing.T) {
+	if got := Run([]string{"read", "--help"}); got != exitcode.Success {
+		t.Fatalf("Run(read --help) = %d, want %d", got, exitcode.Success)
+	}
+}
+
 func TestRunUnknownCommand(t *testing.T) {
 	if got := Run([]string{"bogus"}); got != exitcode.GeneralError {
 		t.Fatalf("Run(bogus) = %d, want %d", got, exitcode.GeneralError)

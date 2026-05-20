@@ -199,6 +199,13 @@ func Run(args []string) int {
 	}
 }
 
+func flagParseExitCode(err error) int {
+	if errors.Is(err, flag.ErrHelp) {
+		return exitcode.Success
+	}
+	return exitcode.ConfigError
+}
+
 func runCompletions(args []string) int {
 	if len(args) != 1 {
 		fmt.Fprintln(os.Stderr, "usage: iec-104-cli completions bash|zsh")
@@ -232,7 +239,7 @@ func runClockSync(opts globalOptions, args []string) int {
 	fs.BoolVar(&safety.DryRun, "dry-run", false, "print clock-sync without sending")
 	fs.BoolVar(&safety.Yes, "yes", false, "send the clock-sync command")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -322,7 +329,7 @@ func runSetpointKind(opts globalOptions, kind string, args []string) int {
 	fs.BoolVar(&safety.DryRun, "dry-run", false, "print setpoint without sending")
 	fs.BoolVar(&safety.Yes, "yes", false, "send the setpoint")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -448,7 +455,7 @@ func runCommandSingle(opts globalOptions, args []string) int {
 	fs.BoolVar(&safety.DryRun, "dry-run", false, "print command without sending")
 	fs.BoolVar(&safety.Yes, "yes", false, "send the command")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -543,7 +550,7 @@ func runCommandDouble(opts globalOptions, args []string) int {
 	fs.BoolVar(&safety.DryRun, "dry-run", false, "print command without sending")
 	fs.BoolVar(&safety.Yes, "yes", false, "send the command")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if err := safety.Validate(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -640,7 +647,7 @@ func runRead(opts globalOptions, args []string) int {
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
@@ -774,7 +781,7 @@ func runWatch(opts globalOptions, args []string) int {
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
@@ -897,7 +904,7 @@ func runInterrogate(opts globalOptions, args []string) int {
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
@@ -984,7 +991,7 @@ func runListen(opts globalOptions, args []string) int {
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
@@ -1078,7 +1085,7 @@ func runTestConnection(opts globalOptions, args []string) int {
 	fs.BoolVar(&debug, "debug", debug, "print protocol-level summaries")
 	fs.BoolVar(&dumpFrames, "dump-frames", dumpFrames, "dump protocol frames to stderr")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	opts.Verbose = verbose
 	opts.Debug = debug
@@ -1193,7 +1200,7 @@ func runGenerateConfigs(_ globalOptions, args []string) int {
 	dir := "examples"
 	fs.StringVar(&dir, "dir", dir, "directory for generated example configs")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if strings.TrimSpace(dir) == "" {
 		fmt.Fprintln(os.Stderr, "--dir is required")
@@ -1227,7 +1234,7 @@ func runInitConfig(_ globalOptions, args []string) int {
 	fs.StringVar(&outputPath, "output", outputPath, "output YAML config file")
 	fs.BoolVar(&force, "force", false, "overwrite output file if it exists")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 	if strings.TrimSpace(outputPath) == "" {
 		fmt.Fprintln(os.Stderr, "--output is required")
@@ -1258,7 +1265,7 @@ func runValidateConfig(opts globalOptions, args []string) int {
 	fs.StringVar(&configPath, "config", configPath, "YAML config file")
 	fs.StringVar(&profile, "profile", profile, "config profile name")
 	if err := fs.Parse(args); err != nil {
-		return exitcode.ConfigError
+		return flagParseExitCode(err)
 	}
 
 	cfg, err := config.LoadRequiredForProfile(configPath, profile, config.Overrides{OutputFormat: &opts.Format})
