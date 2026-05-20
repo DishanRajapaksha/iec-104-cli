@@ -176,9 +176,9 @@ func Run(args []string) int {
 	case "status":
 		return runTestConnection(opts, rest[1:])
 	case "listen":
-		return runListen(opts, rest[1:])
+		return runListen(opts, "listen", rest[1:])
 	case "monitor":
-		return runListen(opts, rest[1:])
+		return runListen(opts, "monitor", rest[1:])
 	case "interrogate":
 		return runInterrogate(opts, rest[1:])
 	case "watch":
@@ -995,8 +995,8 @@ func runInterrogate(opts globalOptions, args []string) int {
 	return exitcode.Success
 }
 
-func runListen(opts globalOptions, args []string) int {
-	fs := flag.NewFlagSet("listen", flag.ContinueOnError)
+func runListen(opts globalOptions, commandName string, args []string) int {
+	fs := flag.NewFlagSet(commandName, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := opts.ConfigPath
 	profile := opts.Profile
