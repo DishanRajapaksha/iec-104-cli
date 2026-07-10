@@ -908,6 +908,12 @@ func runWatch(opts globalOptions, args []string) int {
 		})
 	}()
 
+	if format == "csv" {
+		if err := writePointValueCSVHeader(os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.OutputError
+		}
+	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -926,7 +932,7 @@ func runWatch(opts globalOptions, args []string) int {
 					filtered = append(filtered, enriched)
 				}
 			}
-			if err := writePointValues(os.Stdout, format, filtered); err != nil {
+			if err := writeStreamPointValues(os.Stdout, format, filtered); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return exitcode.OutputError
 			}
@@ -1085,9 +1091,15 @@ func runListen(opts globalOptions, commandName string, args []string) int {
 
 	logVerbose(opts, "listening on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "listen duration=%s common_address=%d ioa=%d point=%q format=%s", duration, commonAddress, ioa, pointName, format)
+	if format == "csv" {
+		if err := writePointValueCSVHeader(os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.OutputError
+		}
+	}
 	err = runListenWithReconnect(ctx, *cfg, opts, "listen", func(value iec104.PointValue) {
 		if enriched, ok := filter(value); ok {
-			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
+			if writeErr := writeStreamPointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
 				fmt.Fprintln(os.Stderr, writeErr)
 			}
 		}

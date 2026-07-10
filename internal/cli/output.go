@@ -35,6 +35,13 @@ func writePointValues(w io.Writer, format string, values []iec104.PointValue) er
 	}
 }
 
+func writeStreamPointValues(w io.Writer, format string, values []iec104.PointValue) error {
+	if format == "csv" {
+		return writePointValueCSVRows(w, values)
+	}
+	return writePointValues(w, format, values)
+}
+
 func writePointValueTable(w io.Writer, values []iec104.PointValue) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	if _, err := fmt.Fprintln(tw, "TIME\tCA\tIOA\tNAME\tTYPE\tVALUE\tUNIT\tCAUSE\tQUALITY"); err != nil {
@@ -80,10 +87,23 @@ func writePointValueText(w io.Writer, values []iec104.PointValue) error {
 }
 
 func writePointValueCSV(w io.Writer, values []iec104.PointValue) error {
-	cw := csv.NewWriter(w)
-	if err := cw.Write([]string{"time", "common_address", "ioa", "name", "type", "value", "unit", "cause", "quality"}); err != nil {
+	if err := writePointValueCSVHeader(w); err != nil {
 		return err
 	}
+	return writePointValueCSVRows(w, values)
+}
+
+func writePointValueCSVHeader(w io.Writer) error {
+	cw := csv.NewWriter(w)
+	if err := cw.Write(pointValueCSVHeader()); err != nil {
+		return err
+	}
+	cw.Flush()
+	return cw.Error()
+}
+
+func writePointValueCSVRows(w io.Writer, values []iec104.PointValue) error {
+	cw := csv.NewWriter(w)
 	for _, value := range values {
 		if err := cw.Write([]string{
 			formatPointTime(value.Timestamp),
@@ -101,6 +121,10 @@ func writePointValueCSV(w io.Writer, values []iec104.PointValue) error {
 	}
 	cw.Flush()
 	return cw.Error()
+}
+
+func pointValueCSVHeader() []string {
+	return []string{"time", "common_address", "ioa", "name", "type", "value", "unit", "cause", "quality"}
 }
 
 func formatPointTime(t time.Time) string {
