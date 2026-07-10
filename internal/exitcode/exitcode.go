@@ -1,14 +1,21 @@
 package exitcode
 
 const (
-	Success = 0
-	GeneralError = 1
-	ConfigError = 2
-	TCPConnectionError = 3
-	IEC104SessionError = 4
-	InterrogationTimeout = 5
-	UnsupportedASDU = 6
-	CommandRejected = 7
-	CommandTimeout = 8
-	OutputError = 9
+	Success                  = 0
+	GeneralError             = 1
+	ConfigError              = 2
+	TransportConnectionError = 3
+	ProtocolRequestError     = 4
+	WriteControlRejected     = 7
+	OperationTimeout         = 8
+	OutputError              = 9
+
+	// Protocol-specific aliases retain descriptive names without changing the
+	// shared cross-CLI meanings of the numeric values.
+	TCPConnectionError   = TransportConnectionError
+	IEC104SessionError   = ProtocolRequestError
+	UnsupportedASDU      = ProtocolRequestError
+	InterrogationTimeout = OperationTimeout
+	CommandRejected      = WriteControlRejected
+	CommandTimeout       = OperationTimeout
 )

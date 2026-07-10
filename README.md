@@ -183,17 +183,24 @@ iec-104-cli clock-sync --time 2026-05-18T12:00:00Z --dry-run
 
 ## Output Formats
 
-Most read-only commands support:
+Snapshot commands support:
 
 ```text
 table
 text
 json
+csv
+```
+
+Streaming commands support:
+
+```text
+text
 jsonl
 csv
 ```
 
-Verbose and debug logs go to stderr so JSON and JSONL stdout remain script-friendly.
+Verbose and debug logs go to stderr so JSON, JSONL, and CSV stdout remain script-friendly.
 
 ## Troubleshooting and Diagnostics
 
@@ -219,13 +226,11 @@ iec-104-cli completions zsh > "${HOME}/.zsh/completions/_iec-104-cli"
 ```text
 0  success
 1  general error
-2  config error
-3  TCP connection error
-4  IEC 104 session or STARTDT error
-5  interrogation timeout
-6  unsupported ASDU or type
-7  command rejected
-8  command timeout
+2  usage or configuration error
+3  transport or connection error
+4  protocol or request error
+7  write or control rejected
+8  operation timeout
 9  output or formatting error
 ```
 

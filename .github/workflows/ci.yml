@@ -6,18 +6,12 @@ on:
       - main
   pull_request:
 
-permissions:
-  contents: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-        with:
-          ref: agent/align-cli-contracts
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -25,52 +19,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Apply CLI contract migration
-        run: python3 scripts/apply-cli-contracts.py
-
-      - name: Format
-        run: gofmt -w internal/exitcode/exitcode.go internal/cli/root.go internal/cli/contracts_test.go
-
       - name: Run tests
         run: go test ./...
 
       - name: Build
         run: make build
-
-      - name: Commit verified changes
-        run: |
-          rm scripts/apply-cli-contracts.py
-          rm .github/workflows/apply-cli-contracts.yml
-          cat > .github/workflows/ci.yml <<'EOF'
-          name: CI
-
-          on:
-            push:
-              branches:
-                - main
-            pull_request:
-
-          jobs:
-            test:
-              runs-on: ubuntu-latest
-              steps:
-                - name: Check out repository
-                  uses: actions/checkout@v4
-
-                - name: Set up Go
-                  uses: actions/setup-go@v5
-                  with:
-                    go-version-file: go.mod
-                    cache: true
-
-                - name: Run tests
-                  run: go test ./...
-
-                - name: Build
-                  run: make build
-          EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Align CLI contracts"
-          git push origin HEAD:agent/align-cli-contracts
