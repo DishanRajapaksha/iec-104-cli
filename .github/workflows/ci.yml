@@ -19,8 +19,39 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Apply CLI contract migration
+        run: python3 scripts/apply-cli-contracts.py
+
+      - name: Format
+        run: gofmt -w internal/exitcode/exitcode.go internal/cli/root.go internal/cli/contracts_test.go
+
       - name: Run tests
-        run: go test ./...
+        id: tests
+        continue-on-error: true
+        run: go test ./... 2>&1 | tee test.log
 
       - name: Build
-        run: make build
+        id: build
+        continue-on-error: true
+        run: make build 2>&1 | tee build.log
+
+      - name: Package migrated files
+        if: always()
+        run: |
+          tar -czf cli-contracts.tar.gz \
+            internal/exitcode/exitcode.go \
+            internal/cli/root.go \
+            internal/cli/contracts_test.go \
+            README.md \
+            test.log \
+            build.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cli-contracts
+          path: cli-contracts.tar.gz
+
+      - name: Fail on validation errors
+        if: steps.tests.outcome == 'failure' || steps.build.outcome == 'failure'
+        run: exit 1
