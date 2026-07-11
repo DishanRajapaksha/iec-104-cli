@@ -22,8 +22,8 @@ const (
 	appName            = "iec-104-cli"
 	defaultConfigPath  = "config.yaml"
 	defaultFormat      = "table"
-	snapshotFormatHelp = "output format: table, text, json, jsonl, csv"
-	streamFormatHelp   = "output format: text, jsonl, csv, table, json"
+	snapshotFormatHelp = "output format: table, text, json, csv"
+	streamFormatHelp   = "output format: text, jsonl, csv"
 )
 
 const generatedBasicConfig = `connection:
@@ -100,6 +100,30 @@ var allowedFormats = map[string]struct{}{
 	"json":  {},
 	"jsonl": {},
 	"csv":   {},
+}
+
+func validateSnapshotFormat(format string) error {
+	switch format {
+	case "table", "text", "json", "csv":
+		return nil
+	case "jsonl":
+		return fmt.Errorf("snapshot commands produce one result; use --format json instead of --format jsonl")
+	default:
+		return fmt.Errorf("invalid snapshot output format %q; expected table, text, json, or csv", format)
+	}
+}
+
+func validateStreamFormat(format string) error {
+	switch format {
+	case "text", "jsonl", "csv":
+		return nil
+	case "json":
+		return fmt.Errorf("stream commands use line-delimited output; use --format jsonl instead of --format json")
+	case "table":
+		return fmt.Errorf("stream commands do not support table output; use text, jsonl, or csv")
+	default:
+		return fmt.Errorf("invalid stream output format %q; expected text, jsonl, or csv", format)
+	}
 }
 
 type uintList []uint
@@ -696,8 +720,8 @@ func runRead(opts globalOptions, args []string) int {
 		fmt.Fprintln(os.Stderr, "at least one --ioa is required")
 		return exitcode.ConfigError
 	}
-	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
+	if err := validateSnapshotFormat(format); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
 
@@ -828,8 +852,8 @@ func runWatch(opts globalOptions, args []string) int {
 		fmt.Fprintln(os.Stderr, "--stale-after must be positive")
 		return exitcode.ConfigError
 	}
-	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
+	if err := validateStreamFormat(format); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
 
@@ -884,6 +908,12 @@ func runWatch(opts globalOptions, args []string) int {
 		})
 	}()
 
+	if format == "csv" {
+		if err := writePointValueCSVHeader(os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.OutputError
+		}
+	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -902,7 +932,7 @@ func runWatch(opts globalOptions, args []string) int {
 					filtered = append(filtered, enriched)
 				}
 			}
-			if err := writePointValues(os.Stdout, format, filtered); err != nil {
+			if err := writeStreamPointValues(os.Stdout, format, filtered); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return exitcode.OutputError
 			}
@@ -943,8 +973,8 @@ func runInterrogate(opts globalOptions, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
+	if err := validateSnapshotFormat(format); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
 
@@ -1030,8 +1060,8 @@ func runListen(opts globalOptions, commandName string, args []string) int {
 	opts.Verbose = verbose
 	opts.Debug = debug
 	opts.DumpFrames = dumpFrames
-	if _, ok := allowedFormats[format]; !ok {
-		fmt.Fprintf(os.Stderr, "invalid output format %q; expected one of table, text, json, jsonl, csv\n", format)
+	if err := validateStreamFormat(format); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		return exitcode.ConfigError
 	}
 
@@ -1061,9 +1091,15 @@ func runListen(opts globalOptions, commandName string, args []string) int {
 
 	logVerbose(opts, "listening on %s:%d", cfg.Connection.Host, cfg.Connection.Port)
 	logDebug(opts, "listen duration=%s common_address=%d ioa=%d point=%q format=%s", duration, commonAddress, ioa, pointName, format)
+	if format == "csv" {
+		if err := writePointValueCSVHeader(os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return exitcode.OutputError
+		}
+	}
 	err = runListenWithReconnect(ctx, *cfg, opts, "listen", func(value iec104.PointValue) {
 		if enriched, ok := filter(value); ok {
-			if writeErr := writePointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
+			if writeErr := writeStreamPointValues(os.Stdout, format, []iec104.PointValue{enriched}); writeErr != nil {
 				fmt.Fprintln(os.Stderr, writeErr)
 			}
 		}
