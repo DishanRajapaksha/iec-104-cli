@@ -16,6 +16,7 @@ import (
 	"github.com/DishanRajapaksha/iec-104-cli/internal/config"
 	"github.com/DishanRajapaksha/iec-104-cli/internal/exitcode"
 	"github.com/DishanRajapaksha/iec-104-cli/internal/iec104"
+	"github.com/DishanRajapaksha/industrial-cli-kit/command"
 )
 
 const (
@@ -1352,95 +1353,63 @@ func runValidateConfig(opts globalOptions, args []string) int {
 }
 
 func parseGlobalOptions(args []string) (globalOptions, []string, error) {
+	validated := defaultGlobalOptions()
+	helpRequested := false
+	versionRequested := false
+	raw := flag.NewFlagSet("global-validation", flag.ContinueOnError)
+	raw.SetOutput(io.Discard)
+	raw.StringVar(&validated.ConfigPath, "config", validated.ConfigPath, "")
+	raw.StringVar(&validated.Profile, "profile", validated.Profile, "")
+	raw.StringVar(&validated.Format, "format", validated.Format, "")
+	raw.DurationVar(&validated.Timeout, "timeout", validated.Timeout, "")
+	raw.BoolVar(&validated.Verbose, "verbose", validated.Verbose, "")
+	raw.BoolVar(&validated.Debug, "debug", validated.Debug, "")
+	raw.BoolVar(&validated.DumpFrames, "dump-frames", validated.DumpFrames, "")
+	raw.BoolVar(&helpRequested, "help", false, "")
+	raw.BoolVar(&helpRequested, "h", false, "")
+	raw.BoolVar(&versionRequested, "version", false, "")
+	raw.BoolVar(&versionRequested, "v", false, "")
+	if err := raw.Parse(args); err != nil {
+		return validated, nil, err
+	}
+	if _, ok := allowedFormats[validated.Format]; !ok {
+		return validated, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl, csv", validated.Format)
+	}
+	timeoutSet := false
+	raw.Visit(func(parsed *flag.Flag) {
+		if parsed.Name == "timeout" {
+			timeoutSet = true
+		}
+	})
+	if timeoutSet && validated.Timeout <= 0 {
+		return validated, nil, fmt.Errorf("timeout must be positive")
+	}
+	if helpRequested {
+		return validated, append([]string{"--help"}, raw.Args()...), nil
+	}
+	if versionRequested {
+		return validated, append([]string{"--version"}, raw.Args()...), nil
+	}
+
+	filtered, err := command.FilterGlobalFlagsForRegistry(args, cliRegistry)
+	if err != nil {
+		return defaultGlobalOptions(), nil, err
+	}
+
 	opts := defaultGlobalOptions()
-	rest := make([]string, 0, len(args))
-
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-
-		if arg == "--" {
-			rest = append(rest, args[i+1:]...)
-			break
-		}
-
-		if !strings.HasPrefix(arg, "-") {
-			rest = append(rest, args[i:]...)
-			break
-		}
-
-		name, value, hasInlineValue := strings.Cut(arg, "=")
-
-		switch name {
-		case "--config":
-			v, next, err := flagValue("--config", value, hasInlineValue, args, i)
-			if err != nil {
-				return opts, nil, err
-			}
-			opts.ConfigPath = v
-			i = next
-		case "--profile":
-			v, next, err := flagValue("--profile", value, hasInlineValue, args, i)
-			if err != nil {
-				return opts, nil, err
-			}
-			opts.Profile = v
-			i = next
-		case "--format":
-			v, next, err := flagValue("--format", value, hasInlineValue, args, i)
-			if err != nil {
-				return opts, nil, err
-			}
-			if _, ok := allowedFormats[v]; !ok {
-				return opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl, csv", v)
-			}
-			opts.Format = v
-			i = next
-		case "--timeout":
-			v, next, err := flagValue("--timeout", value, hasInlineValue, args, i)
-			if err != nil {
-				return opts, nil, err
-			}
-			d, err := time.ParseDuration(v)
-			if err != nil {
-				return opts, nil, fmt.Errorf("invalid timeout %q: %w", v, err)
-			}
-			if d <= 0 {
-				return opts, nil, fmt.Errorf("timeout must be positive")
-			}
-			opts.Timeout = d
-			i = next
-		case "--verbose":
-			opts.Verbose = true
-		case "--debug":
-			opts.Debug = true
-		case "--dump-frames":
-			opts.DumpFrames = true
-		case "--help", "-h", "--version", "-v":
-			rest = append(rest, arg)
-			rest = append(rest, args[i+1:]...)
-			return opts, rest, nil
-		default:
-			return opts, nil, fmt.Errorf("unknown global flag %q", name)
-		}
+	fs := flag.NewFlagSet("global", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.StringVar(&opts.ConfigPath, "config", opts.ConfigPath, "")
+	fs.StringVar(&opts.Profile, "profile", opts.Profile, "")
+	fs.StringVar(&opts.Format, "format", opts.Format, "")
+	fs.DurationVar(&opts.Timeout, "timeout", opts.Timeout, "")
+	fs.BoolVar(&opts.Verbose, "verbose", opts.Verbose, "")
+	fs.BoolVar(&opts.Debug, "debug", opts.Debug, "")
+	fs.BoolVar(&opts.DumpFrames, "dump-frames", opts.DumpFrames, "")
+	if err := fs.Parse(filtered); err != nil {
+		return opts, nil, err
 	}
-
-	return opts, rest, nil
-}
-
-func flagValue(name, inlineValue string, hasInlineValue bool, args []string, index int) (string, int, error) {
-	if hasInlineValue {
-		if inlineValue == "" {
-			return "", index, fmt.Errorf("%s requires a value", name)
-		}
-		return inlineValue, index, nil
-	}
-
-	next := index + 1
-	if next >= len(args) || strings.HasPrefix(args[next], "-") {
-		return "", index, fmt.Errorf("%s requires a value", name)
-	}
-
-	return args[next], next, nil
+	return opts, fs.Args(), nil
 }
 
 func printHelp(out *os.File) {
