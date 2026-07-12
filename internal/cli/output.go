@@ -1,111 +1,48 @@
 package cli
 
 import (
-	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strconv"
-	"text/tabwriter"
 	"time"
 
 	"github.com/DishanRajapaksha/iec-104-cli/internal/iec104"
+	shared "github.com/DishanRajapaksha/industrial-cli-kit/output"
 )
 
 func writePointValues(w io.Writer, format string, values []iec104.PointValue) error {
 	switch format {
-	case "table":
+	case shared.FormatTable:
 		return writePointValueTable(w, values)
-	case "text":
+	case shared.FormatText:
 		return writePointValueText(w, values)
-	case "json":
-		return json.NewEncoder(w).Encode(values)
-	case "jsonl":
-		enc := json.NewEncoder(w)
+	case shared.FormatJSON:
+		return shared.WriteJSON(w, values)
+	case shared.FormatJSONL:
 		for _, value := range values {
-			if err := enc.Encode(value); err != nil {
+			if err := shared.WriteJSONLine(w, value); err != nil {
 				return err
 			}
 		}
 		return nil
-	case "csv":
+	case shared.FormatCSV:
 		return writePointValueCSV(w, values)
 	default:
-		return fmt.Errorf("unsupported output format %q", format)
+		return fmt.Errorf("%w: unsupported output format %q", shared.ErrOutput, format)
 	}
 }
 
 func writeStreamPointValues(w io.Writer, format string, values []iec104.PointValue) error {
-	if format == "csv" {
+	if format == shared.FormatCSV {
 		return writePointValueCSVRows(w, values)
 	}
 	return writePointValues(w, format, values)
 }
 
 func writePointValueTable(w io.Writer, values []iec104.PointValue) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "TIME\tCA\tIOA\tNAME\tTYPE\tVALUE\tUNIT\tCAUSE\tQUALITY"); err != nil {
-		return err
-	}
+	rows := make([][]string, 0, len(values))
 	for _, value := range values {
-		if _, err := fmt.Fprintf(tw, "%s\t%d\t%d\t%s\t%s\t%v\t%s\t%s\t%s\n",
-			formatPointTime(value.Timestamp),
-			value.CommonAddress,
-			value.IOA,
-			value.Name,
-			value.Type,
-			value.Value,
-			value.Unit,
-			value.Cause,
-			value.Quality.Display(),
-		); err != nil {
-			return err
-		}
-	}
-	return tw.Flush()
-}
-
-func writePointValueText(w io.Writer, values []iec104.PointValue) error {
-	for _, value := range values {
-		name := value.Name
-		if name == "" {
-			name = fmt.Sprintf("%d", value.IOA)
-		}
-		if _, err := fmt.Fprintf(w, "%s=%v", name, value.Value); err != nil {
-			return err
-		}
-		if value.Unit != "" {
-			if _, err := fmt.Fprintf(w, " %s", value.Unit); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintln(w); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writePointValueCSV(w io.Writer, values []iec104.PointValue) error {
-	if err := writePointValueCSVHeader(w); err != nil {
-		return err
-	}
-	return writePointValueCSVRows(w, values)
-}
-
-func writePointValueCSVHeader(w io.Writer) error {
-	cw := csv.NewWriter(w)
-	if err := cw.Write(pointValueCSVHeader()); err != nil {
-		return err
-	}
-	cw.Flush()
-	return cw.Error()
-}
-
-func writePointValueCSVRows(w io.Writer, values []iec104.PointValue) error {
-	cw := csv.NewWriter(w)
-	for _, value := range values {
-		if err := cw.Write([]string{
+		rows = append(rows, []string{
 			formatPointTime(value.Timestamp),
 			strconv.FormatUint(uint64(value.CommonAddress), 10),
 			strconv.FormatUint(uint64(value.IOA), 10),
@@ -115,12 +52,56 @@ func writePointValueCSVRows(w io.Writer, values []iec104.PointValue) error {
 			value.Unit,
 			value.Cause,
 			value.Quality.Display(),
-		}); err != nil {
+		})
+	}
+	return shared.WriteTable(w, []string{"TIME", "CA", "IOA", "NAME", "TYPE", "VALUE", "UNIT", "CAUSE", "QUALITY"}, rows)
+}
+
+func writePointValueText(w io.Writer, values []iec104.PointValue) error {
+	for _, value := range values {
+		name := value.Name
+		if name == "" {
+			name = fmt.Sprintf("%d", value.IOA)
+		}
+		line := fmt.Sprintf("%s=%v", name, value.Value)
+		if value.Unit != "" {
+			line += " " + value.Unit
+		}
+		if err := shared.WriteText(w, line); err != nil {
 			return err
 		}
 	}
-	cw.Flush()
-	return cw.Error()
+	return nil
+}
+
+func writePointValueCSV(w io.Writer, values []iec104.PointValue) error {
+	return shared.WriteCSV(w, pointValueCSVHeader(), pointValueCSVRows(values))
+}
+
+func writePointValueCSVHeader(w io.Writer) error {
+	return shared.WriteCSV(w, pointValueCSVHeader(), nil)
+}
+
+func writePointValueCSVRows(w io.Writer, values []iec104.PointValue) error {
+	return shared.WriteCSVRows(w, pointValueCSVRows(values))
+}
+
+func pointValueCSVRows(values []iec104.PointValue) [][]string {
+	rows := make([][]string, 0, len(values))
+	for _, value := range values {
+		rows = append(rows, []string{
+			formatPointTime(value.Timestamp),
+			strconv.FormatUint(uint64(value.CommonAddress), 10),
+			strconv.FormatUint(uint64(value.IOA), 10),
+			value.Name,
+			value.Type,
+			fmt.Sprint(value.Value),
+			value.Unit,
+			value.Cause,
+			value.Quality.Display(),
+		})
+	}
+	return rows
 }
 
 func pointValueCSVHeader() []string {
