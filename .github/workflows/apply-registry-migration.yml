@@ -1,0 +1,93 @@
+name: Apply registry parser migration
+
+on:
+  push:
+    branches:
+      - agent/adopt-registry-parser
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/adopt-registry-parser
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Replace prefix parser
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("internal/cli/root.go")
+          text = path.read_text()
+          command_import = '\t"github.com/DishanRajapaksha/industrial-cli-kit/command"\n'
+          config_import = '\t"github.com/DishanRajapaksha/iec-104-cli/internal/config"\n'
+          if command_import not in text:
+              text = text.replace(config_import, config_import + command_import, 1)
+
+          start = text.index("func parseGlobalOptions")
+          end = text.index("func printHelp", start)
+          replacement = '''func parseGlobalOptions(args []string) (globalOptions, []string, error) {
+          \tfiltered, err := command.FilterGlobalFlagsForRegistry(args, cliRegistry)
+          \tif err != nil {
+          \t\treturn defaultGlobalOptions(), nil, err
+          \t}
+
+          \topts := defaultGlobalOptions()
+          \tif len(filtered) > 0 {
+          \t\tswitch filtered[0] {
+          \t\tcase "--help", "-h", "--version", "-v":
+          \t\t\treturn opts, filtered, nil
+          \t\t}
+          \t}
+
+          \tfs := flag.NewFlagSet("global", flag.ContinueOnError)
+          \tfs.SetOutput(io.Discard)
+          \tfs.StringVar(&opts.ConfigPath, "config", opts.ConfigPath, "")
+          \tfs.StringVar(&opts.Profile, "profile", opts.Profile, "")
+          \tfs.StringVar(&opts.Format, "format", opts.Format, "")
+          \tfs.DurationVar(&opts.Timeout, "timeout", opts.Timeout, "")
+          \tfs.BoolVar(&opts.Verbose, "verbose", opts.Verbose, "")
+          \tfs.BoolVar(&opts.Debug, "debug", opts.Debug, "")
+          \tfs.BoolVar(&opts.DumpFrames, "dump-frames", opts.DumpFrames, "")
+          \tif err := fs.Parse(filtered); err != nil {
+          \t\tif errors.Is(err, flag.ErrHelp) {
+          \t\t\treturn opts, []string{"--help"}, nil
+          \t\t}
+          \t\treturn opts, nil, err
+          \t}
+          \tif _, ok := allowedFormats[opts.Format]; !ok {
+          \t\treturn opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl, csv", opts.Format)
+          \t}
+          \tif opts.Timeout <= 0 {
+          \t\treturn opts, nil, fmt.Errorf("timeout must be positive")
+          \t}
+          \treturn opts, fs.Args(), nil
+          }
+
+          '''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text)
+          PY
+          gofmt -w internal/cli/root.go
+      - name: Resolve shared CLI kit
+        run: |
+          go get github.com/DishanRajapaksha/industrial-cli-kit@0d5ccd0d9419
+          go mod tidy
+      - name: Test migration
+        run: go test ./...
+      - name: Commit migration
+        run: |
+          if git diff --quiet -- internal/cli/root.go go.mod go.sum; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add internal/cli/root.go go.mod go.sum
+          git commit -m "Use registry-aware global flag parsing"
+          git push origin HEAD:agent/adopt-registry-parser
