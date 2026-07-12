@@ -86,8 +86,25 @@ jobs:
         run: |
           go get github.com/DishanRajapaksha/industrial-cli-kit@0d5ccd0d9419
           go mod tidy
-      - name: Test migration
-        run: go test ./...
+      - name: Capture migration tests
+        run: |
+          set +e
+          go test ./... > test.log 2>&1
+          echo "$?" > test.status
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: registry-migration-test-log
+          path: |
+            test.log
+            test.status
+      - name: Require passing tests
+        run: |
+          status=$(cat test.status)
+          if [ "$status" -ne 0 ]; then
+            cat test.log
+            exit "$status"
+          fi
       - name: Commit migration
         run: |
           if git diff --quiet -- internal/cli/root.go go.mod go.sum; then
