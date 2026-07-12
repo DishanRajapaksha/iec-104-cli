@@ -65,7 +65,13 @@ jobs:
           \tif _, ok := allowedFormats[opts.Format]; !ok {
           \t\treturn opts, nil, fmt.Errorf("invalid output format %q; expected one of table, text, json, jsonl, csv", opts.Format)
           \t}
-          \tif opts.Timeout <= 0 {
+          \ttimeoutSet := false
+          \tfs.Visit(func(parsed *flag.Flag) {
+          \t\tif parsed.Name == "timeout" {
+          \t\t\ttimeoutSet = true
+          \t\t}
+          \t})
+          \tif timeoutSet && opts.Timeout <= 0 {
           \t\treturn opts, nil, fmt.Errorf("timeout must be positive")
           \t}
           \treturn opts, fs.Args(), nil
