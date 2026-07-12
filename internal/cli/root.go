@@ -1444,44 +1444,5 @@ func flagValue(name, inlineValue string, hasInlineValue bool, args []string, ind
 }
 
 func printHelp(out *os.File) {
-	fmt.Fprintf(out, `%s is a script-friendly IEC 60870-5-104 command-line client.
-
-Usage:
-  %s [global flags] <command> [flags]
-  %s test-connection --host 127.0.0.1 --port 2404
-  %s read --ioa 1001
-  %s listen --duration 10s --format jsonl
-  %s interrogate --common-address 1 --format table
-  %s command single --ioa 1000 --value on
-  %s init-config
-  %s version
-
-Common flags:
-  --config string     Config file path (default "config.yaml")
-  --profile string    Config profile name
-  --format string     Output format: table, text, json, jsonl, csv (default "table")
-  --timeout duration  Operation timeout, for example 10s or 1m
-  --verbose           Print high-level diagnostics to stderr
-  --debug             Print protocol-level diagnostics to stderr
-  --dump-frames       Dump protocol frames to stderr
-
-Available commands:
-  help             Show this help message
-  version          Show version information
-  validate-config  Validate local config without server connection
-  init-config      Write a starter YAML config file
-  generate-configs Generate example config files
-  status           Run TCP and IEC 104 STARTDT diagnostics
-  test-connection  Run TCP and IEC 104 STARTDT diagnostics
-  listen           Print incoming point values
-  monitor          Print incoming point values
-  interrogate      Send general interrogation and print matching values
-  watch            Print latest cached values on an interval
-  read             Send IEC 104 read for a specific IOA
-  command          Run control commands with dry-run safety
-  setpoint         Run setpoint commands with dry-run safety
-  clock-sync       Run clock synchronization with dry-run safety
-  completions
-
-`, appName, appName, appName, appName, appName, appName, appName, appName, appName)
+	writeRegistryHelp(out)
 }
