@@ -20,7 +20,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          signature = 'func printHelp(w io.Writer)'
+          signature = 'func printHelp(out *os.File)'
           matches = []
           for path in Path('internal/cli').glob('*.go'):
               text = path.read_text()
@@ -41,7 +41,7 @@ jobs:
                       end = index + 1
                       break
           if end is None: raise SystemExit('printHelp closing brace not found')
-          path.write_text(text[:start] + signature + ' {\n\twriteRegistryHelp(w)\n}' + text[end:])
+          path.write_text(text[:start] + signature + ' {\n\twriteRegistryHelp(out)\n}' + text[end:])
           print(path)
           PY
       - name: Commit help migration
